@@ -18,6 +18,10 @@ namespace Titan
         [SerializeField] private float turnSpeed = 75f;
         [SerializeField] private float bodySmoothing = 8f;
 
+        [Header("Waist Rotation")]
+        [SerializeField] private float waistTurnSpeed = 120f;
+        [SerializeField] private Vector2 waistYawLimit = new Vector2(-180f, 180f);
+
         [Header("Physics")]
         [SerializeField] private float gravityScale = 1f;
         [SerializeField] private float groundProbeHeight = 0.35f;
@@ -53,6 +57,7 @@ namespace Titan
         private float forwardInput;
         private float strafeInput;
         private float turnInput;
+        private float waistYaw;
         private bool inputEnabled = true;
 
         public TitanRole Role => TitanRole.Body;
@@ -108,6 +113,14 @@ namespace Titan
                 KeyCode.Comma,
                 Key.Period,
                 Key.Comma);
+
+            float waistInput = TitanInputUtility.GetAxis(
+                KeyCode.D,
+                KeyCode.A,
+                Key.D,
+                Key.A);
+
+            UpdateWaistRotation(waistInput, deltaTime);
         }
 
         public void TickPhysics(float deltaTime)
@@ -431,6 +444,22 @@ namespace Titan
             }
 
             return hasRight && !hasLeft;
+        }
+
+        private void UpdateWaistRotation(float waistInput, float deltaTime)
+        {
+            if (rig == null)
+            {
+                return;
+            }
+
+            if (rig.Spine == null)
+            {
+                return;
+            }
+
+            waistYaw = Mathf.Clamp(waistYaw + (waistInput * waistTurnSpeed * deltaTime), waistYawLimit.x, waistYawLimit.y);
+            rig.ApplySpine(0f, waistYaw, 0f);
         }
     }
 }

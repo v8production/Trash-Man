@@ -14,6 +14,7 @@ namespace Titan
         [SerializeField] private Transform leftKnee;
         [SerializeField] private Transform rightHip;
         [SerializeField] private Transform rightKnee;
+        [SerializeField] private Transform spine;
 
         private Animator animator;
 
@@ -25,12 +26,14 @@ namespace Titan
         private Quaternion leftKneeBaseRotation;
         private Quaternion rightHipBaseRotation;
         private Quaternion rightKneeBaseRotation;
+        private Quaternion spineBaseRotation;
 
         private bool warnedMissingBones;
         private bool loggedResolvedBones;
         private bool basePoseInitialized;
 
         public Transform MovementRoot => mechaRoot != null ? mechaRoot : transform;
+        public Transform Spine => spine;
 
         private void Awake()
         {
@@ -55,7 +58,7 @@ namespace Titan
             if (hasAnyDrivenBone && !loggedResolvedBones)
             {
                 loggedResolvedBones = true;
-                Debug.Log($"[TitanRig] Resolved bones - LS:{NameOrNone(leftShoulder)} LE:{NameOrNone(leftElbow)} RS:{NameOrNone(rightShoulder)} RE:{NameOrNone(rightElbow)} LH:{NameOrNone(leftHip)} LK:{NameOrNone(leftKnee)} RH:{NameOrNone(rightHip)} RK:{NameOrNone(rightKnee)}", this);
+                Debug.Log($"[TitanRig] Resolved bones - LS:{NameOrNone(leftShoulder)} LE:{NameOrNone(leftElbow)} RS:{NameOrNone(rightShoulder)} RE:{NameOrNone(rightElbow)} LH:{NameOrNone(leftHip)} LK:{NameOrNone(leftKnee)} RH:{NameOrNone(rightHip)} RK:{NameOrNone(rightKnee)} SP:{NameOrNone(spine)}", this);
             }
 
             return hasAnyDrivenBone;
@@ -113,6 +116,14 @@ namespace Titan
             }
         }
 
+        public void ApplySpine(float yaw, float pitch = 0f, float roll = 0f)
+        {
+            if (spine != null)
+            {
+                spine.localRotation = spineBaseRotation * Quaternion.Euler(pitch, yaw, roll);
+            }
+        }
+
         private void ResolveAndCacheIfNeeded(bool forceCache)
         {
             int before = ComputeBoneSignature();
@@ -148,6 +159,9 @@ namespace Titan
                 leftKnee ??= animator.GetBoneTransform(HumanBodyBones.LeftLowerLeg);
                 rightHip ??= animator.GetBoneTransform(HumanBodyBones.RightUpperLeg);
                 rightKnee ??= animator.GetBoneTransform(HumanBodyBones.RightLowerLeg);
+                spine ??= animator.GetBoneTransform(HumanBodyBones.Chest);
+                spine ??= animator.GetBoneTransform(HumanBodyBones.UpperChest);
+                spine ??= animator.GetBoneTransform(HumanBodyBones.Spine);
             }
 
             leftShoulder ??= FindChildByNames(searchRoot,
@@ -186,6 +200,13 @@ namespace Titan
                 "Character1_RightLeg", "RightLeg", "mixamorig:RightLeg", "mixamorigRightLeg",
                 "J_Bip_R_LowerLeg", "RightLowerLeg", "LowerLeg_R", "R_Calf", "Bip001 R Calf");
 
+            spine ??= FindChildByNames(searchRoot,
+                "Character1_Chest", "Character1_UpperChest", "Character1_Spine",
+                "UpperChest", "Chest", "Spine",
+                "mixamorig:UpperChest", "mixamorig:Chest", "mixamorig:Spine",
+                "mixamorigUpperChest", "mixamorigChest", "mixamorigSpine",
+                "J_Bip_C_Chest", "J_Bip_C_Spine", "Bip001 Spine1", "Bip001 Spine");
+
             leftShoulder ??= FindByKeywords(searchRoot, true, "shoulder", "upperarm", "arm", "clavicle");
             leftElbow ??= FindByKeywords(leftShoulder != null ? leftShoulder : searchRoot, true, "lowerarm", "forearm", "elbow");
             rightShoulder ??= FindByKeywords(searchRoot, false, "shoulder", "upperarm", "arm", "clavicle");
@@ -195,6 +216,7 @@ namespace Titan
             leftKnee ??= FindByKeywords(leftHip != null ? leftHip : searchRoot, true, "lowerleg", "calf", "shin", "leg");
             rightHip ??= FindByKeywords(searchRoot, false, "upleg", "upperleg", "thigh", "leg");
             rightKnee ??= FindByKeywords(rightHip != null ? rightHip : searchRoot, false, "lowerleg", "calf", "shin", "leg");
+            spine ??= FindByCenterKeywords(searchRoot, "upperchest", "chest", "spine", "torso", "waist");
         }
 
         private bool HasAnyDrivenBone()
@@ -207,7 +229,38 @@ namespace Titan
                 leftHip != null ||
                 leftKnee != null ||
                 rightHip != null ||
-                rightKnee != null;
+                rightKnee != null ||
+                spine != null;
+        }
+
+        private static Transform FindByCenterKeywords(Transform root, params string[] keywords)
+        {
+            if (root == null)
+            {
+                return null;
+            }
+
+            Transform[] all = root.GetComponentsInChildren<Transform>(true);
+            for (int i = 0; i < all.Length; i++)
+            {
+                Transform current = all[i];
+                string lower = current.name.ToLowerInvariant();
+
+                if (IsRejectedBoneName(lower))
+                {
+                    continue;
+                }
+
+                for (int k = 0; k < keywords.Length; k++)
+                {
+                    if (lower.Contains(keywords[k]))
+                    {
+                        return current;
+                    }
+                }
+            }
+
+            return null;
         }
 
         private static Transform FindByKeywords(Transform root, bool isLeft, params string[] keywords)
@@ -338,6 +391,7 @@ namespace Titan
                 signature = (signature * 23) + GetId(leftKnee);
                 signature = (signature * 23) + GetId(rightHip);
                 signature = (signature * 23) + GetId(rightKnee);
+                signature = (signature * 23) + GetId(spine);
                 return signature;
             }
         }
@@ -392,6 +446,11 @@ namespace Titan
             if (rightKnee != null)
             {
                 rightKneeBaseRotation = rightKnee.localRotation;
+            }
+
+            if (spine != null)
+            {
+                spineBaseRotation = spine.localRotation;
             }
         }
     }
