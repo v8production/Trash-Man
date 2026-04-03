@@ -60,7 +60,7 @@ public class Define
 
     public static float epsilon = 1e-8f;
 
-    public enum TrashTitanRole
+    public enum TitanRole
     {
         Body = 1,
         LeftArm = 2,
