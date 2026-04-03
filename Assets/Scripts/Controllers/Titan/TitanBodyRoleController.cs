@@ -22,8 +22,10 @@ namespace Titan
         [SerializeField] private float gravityScale = 1f;
         [SerializeField] private float groundProbeHeight = 0.35f;
         [SerializeField] private float groundProbeDistance = 0.7f;
-        [SerializeField] private float groundSkinWidth = 0.03f;
         [SerializeField] private LayerMask groundLayers = ~0;
+        [SerializeField] private float movementAcceleration = 8f;
+        [SerializeField] private float maxPlanarSpeed = 4.5f;
+        [SerializeField] private float turnAcceleration = 85f;
 
         [Header("Balance")]
         [SerializeField] private float balanceTorque = 160f;
@@ -32,6 +34,14 @@ namespace Titan
         [SerializeField] private float gravityRollAcceleration = 120f;
         [SerializeField] private float rollDamping = 6f;
         [SerializeField] private float maxRollAngle = 65f;
+        [SerializeField] private float maxBalanceTorque = 240f;
+
+        [Header("Aerodynamic Drag Rotation")]
+        [SerializeField] private Transform centerOfPressure;
+        [SerializeField] private Vector3 centerOfPressureLocalOffset = new Vector3(0f, 1.1f, -0.6f);
+        [SerializeField] private float dragTorqueScale = 0.03f;
+        [SerializeField] private float maxDragTorque = 160f;
+        [SerializeField] private float minDragSpeed = 0.75f;
 
         [Header("Foot Anchors")]
         [SerializeField] private Transform leftFoot;
@@ -43,8 +53,6 @@ namespace Titan
         private float forwardInput;
         private float strafeInput;
         private float turnInput;
-        private float rollVelocity;
-        private float rollAngle;
         private bool inputEnabled = true;
 
         public TitanRole Role => TitanRole.Body;
@@ -138,6 +146,12 @@ namespace Titan
                 grounded = IsBodyGrounded(movementRoot);
             }
 
+            if (movementRigidbody != null)
+            {
+                ApplyRigidbodyPhysics(movementRoot, leftGrounded, rightGrounded, grounded);
+                return;
+            }
+
             if (grounded && verticalVelocity < 0f)
             {
                 verticalVelocity = -1f;
@@ -149,46 +163,44 @@ namespace Titan
 
             float yawStep = turnInput * turnSpeed * deltaTime;
             float verticalStep = verticalVelocity * deltaTime;
-
-            if (movementRigidbody != null)
-            {
-                if (verticalStep < 0f)
-                {
-                    float desiredDrop = Mathf.Abs(verticalStep);
-                    Vector3 probeOrigin = movementRigidbody.worldCenterOfMass + (Vector3.up * groundProbeHeight);
-                    float probeDistance = groundProbeHeight + desiredDrop + groundSkinWidth;
-                    if (Physics.Raycast(probeOrigin, Vector3.down, out RaycastHit hit, probeDistance, groundLayers, QueryTriggerInteraction.Ignore))
-                    {
-                        float availableDrop = hit.distance - groundProbeHeight - groundSkinWidth;
-                        if (availableDrop <= desiredDrop)
-                        {
-                            verticalStep = -Mathf.Max(availableDrop, 0f);
-                            verticalVelocity = 0f;
-                            grounded = true;
-                        }
-                    }
-                }
-
-                Vector3 movementStep = (planarVelocity * deltaTime) + (Vector3.up * verticalStep);
-                Vector3 nextPosition = movementRigidbody.position + movementStep;
-                Quaternion yawRotation = Quaternion.AngleAxis(yawStep, Vector3.up) * movementRigidbody.rotation;
-                Quaternion nextRotation = ComputeBalancedRotation(yawRotation, leftGrounded, rightGrounded, grounded, deltaTime);
-                movementRigidbody.MovePosition(nextPosition);
-                movementRigidbody.MoveRotation(nextRotation);
-                return;
-            }
-
             Vector3 movement = (planarVelocity * deltaTime) + (Vector3.up * verticalStep);
             movementRoot.position += movement;
-            Quaternion rootYawRotation = Quaternion.AngleAxis(yawStep, Vector3.up) * movementRoot.rotation;
-            movementRoot.rotation = ComputeBalancedRotation(rootYawRotation, leftGrounded, rightGrounded, grounded, deltaTime);
+            movementRoot.rotation = Quaternion.AngleAxis(yawStep, Vector3.up) * movementRoot.rotation;
         }
 
-        private Quaternion ComputeBalancedRotation(Quaternion currentYawRotation, bool leftGrounded, bool rightGrounded, bool grounded, float deltaTime)
+        private void ApplyRigidbodyPhysics(Transform movementRoot, bool leftGrounded, bool rightGrounded, bool grounded)
         {
             if (movementRigidbody == null)
             {
-                return currentYawRotation;
+                return;
+            }
+
+            Vector3 velocity = movementRigidbody.linearVelocity;
+            Vector3 currentPlanarVelocity = Vector3.ProjectOnPlane(velocity, Vector3.up);
+            Vector3 planarDelta = planarVelocity - currentPlanarVelocity;
+            Vector3 planarAcceleration = planarDelta * movementAcceleration;
+            movementRigidbody.AddForce(planarAcceleration, ForceMode.Acceleration);
+
+            Vector3 clampedPlanarVelocity = Vector3.ClampMagnitude(Vector3.ProjectOnPlane(movementRigidbody.linearVelocity, Vector3.up), maxPlanarSpeed);
+            movementRigidbody.linearVelocity = clampedPlanarVelocity + (Vector3.up * movementRigidbody.linearVelocity.y);
+
+            float yawAcceleration = turnInput * turnAcceleration;
+            movementRigidbody.AddTorque(Vector3.up * yawAcceleration, ForceMode.Acceleration);
+
+            if (gravityScale > 1f)
+            {
+                movementRigidbody.AddForce(Physics.gravity * (gravityScale - 1f), ForceMode.Acceleration);
+            }
+
+            ApplyBalanceTorque(movementRoot, leftGrounded, rightGrounded, grounded);
+            ApplyDragDirectionTorque(movementRoot);
+        }
+
+        private void ApplyBalanceTorque(Transform movementRoot, bool leftGrounded, bool rightGrounded, bool grounded)
+        {
+            if (movementRigidbody == null)
+            {
+                return;
             }
 
             Vector3 centerOfMass = movementRigidbody.worldCenterOfMass;
@@ -218,7 +230,7 @@ namespace Titan
 
             Vector3 planarOffset = Vector3.ProjectOnPlane(centerOfMass - supportCenter, Vector3.up);
             float oneLegFactor = (leftGrounded ^ rightGrounded) ? oneLegInstabilityMultiplier : 1f;
-            float comRightBias = Vector3.Dot(planarOffset, currentYawRotation * Vector3.right);
+            float comRightBias = Vector3.Dot(planarOffset, movementRoot.right);
             float signedFall = 0f;
 
             if (leftGrounded && !rightGrounded)
@@ -236,32 +248,69 @@ namespace Titan
 
             float gravityInfluence = gravityRollAcceleration * oneLegFactor;
             float comInfluence = Mathf.Clamp(comRightBias, -1f, 1f) * balanceTorque;
-            float angularAcceleration = (signedFall * gravityInfluence) + comInfluence;
+            float rollRate = Vector3.Dot(movementRigidbody.angularVelocity, movementRoot.forward);
+            float dampingInfluence = -rollRate * rollDamping;
+            float rollAngle = ComputeSignedRollAngle(movementRoot);
+            float recoverInfluence = 0f;
+
+            if (leftGrounded && rightGrounded)
+            {
+                recoverInfluence = -rollAngle * uprightRecoverySpeed;
+            }
+
+            if (Mathf.Abs(rollAngle) > maxRollAngle)
+            {
+                float overflow = Mathf.Abs(rollAngle) - maxRollAngle;
+                recoverInfluence += -Mathf.Sign(rollAngle) * overflow * uprightRecoverySpeed;
+            }
+
+            float angularAcceleration = (signedFall * gravityInfluence) + comInfluence + dampingInfluence + recoverInfluence;
 
             if (!grounded)
             {
                 angularAcceleration *= 0.6f;
             }
 
-            rollVelocity += angularAcceleration * deltaTime;
-            float dampingFactor = 1f - Mathf.Exp(-rollDamping * deltaTime);
-            rollVelocity = Mathf.Lerp(rollVelocity, 0f, dampingFactor);
+            angularAcceleration = Mathf.Clamp(angularAcceleration, -maxBalanceTorque, maxBalanceTorque);
+            movementRigidbody.AddTorque(movementRoot.forward * angularAcceleration, ForceMode.Acceleration);
+        }
 
-            if (leftGrounded && rightGrounded)
+        private void ApplyDragDirectionTorque(Transform movementRoot)
+        {
+            if (movementRigidbody == null)
             {
-                float recoverT = 1f - Mathf.Exp(-uprightRecoverySpeed * deltaTime);
-                rollAngle = Mathf.Lerp(rollAngle, 0f, recoverT);
-            }
-            else
-            {
-                rollAngle += rollVelocity * deltaTime;
+                return;
             }
 
-            rollAngle = Mathf.Clamp(rollAngle, -maxRollAngle, maxRollAngle);
-            Vector3 rollAxis = currentYawRotation * Vector3.forward;
-            Quaternion rollRotation = Quaternion.AngleAxis(rollAngle, rollAxis);
+            Vector3 velocity = movementRigidbody.linearVelocity;
+            float speed = velocity.magnitude;
+            if (speed < minDragSpeed)
+            {
+                return;
+            }
 
-            return rollRotation * currentYawRotation;
+            Vector3 airflowDirection = -velocity / speed;
+            Vector3 pressurePoint = centerOfPressure != null
+                ? centerOfPressure.position
+                : movementRoot.TransformPoint(centerOfPressureLocalOffset);
+            Vector3 lever = pressurePoint - movementRigidbody.worldCenterOfMass;
+            float dragForceMagnitude = speed * speed * dragTorqueScale;
+            Vector3 dragForce = airflowDirection * dragForceMagnitude;
+            Vector3 dragTorque = Vector3.Cross(lever, dragForce);
+            dragTorque = Vector3.ClampMagnitude(dragTorque, maxDragTorque);
+            movementRigidbody.AddTorque(dragTorque, ForceMode.Acceleration);
+        }
+
+        private static float ComputeSignedRollAngle(Transform movementRoot)
+        {
+            Vector3 projectedUp = Vector3.ProjectOnPlane(movementRoot.up, movementRoot.forward);
+            Vector3 projectedWorldUp = Vector3.ProjectOnPlane(Vector3.up, movementRoot.forward);
+            if (projectedUp.sqrMagnitude < 0.0001f || projectedWorldUp.sqrMagnitude < 0.0001f)
+            {
+                return 0f;
+            }
+
+            return Vector3.SignedAngle(projectedWorldUp, projectedUp, movementRoot.forward);
         }
 
         private bool IsFootGrounded(Transform foot)

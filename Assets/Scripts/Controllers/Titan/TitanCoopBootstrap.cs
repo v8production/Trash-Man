@@ -108,10 +108,13 @@ namespace Titan
                 rigidbody = target.AddComponent<Rigidbody>();
             }
 
-            rigidbody.useGravity = false;
-            rigidbody.isKinematic = true;
+            rigidbody.useGravity = true;
+            rigidbody.isKinematic = false;
+            rigidbody.mass = 900f;
+            rigidbody.linearDamping = 0.35f;
+            rigidbody.angularDamping = 1.2f;
             rigidbody.interpolation = RigidbodyInterpolation.Interpolate;
-            rigidbody.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
+            rigidbody.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
 
             MeshFilter[] meshFilters = target.GetComponentsInChildren<MeshFilter>(true);
             for (int i = 0; i < meshFilters.Length; i++)
@@ -129,7 +132,7 @@ namespace Titan
                 }
 
                 meshCollider.sharedMesh = meshFilter.sharedMesh;
-                meshCollider.convex = false;
+                meshCollider.convex = true;
             }
 
             SkinnedMeshRenderer[] skinnedMeshRenderers = target.GetComponentsInChildren<SkinnedMeshRenderer>(true);
@@ -147,7 +150,7 @@ namespace Titan
                     meshCollider = skinnedMeshRenderer.gameObject.AddComponent<MeshCollider>();
                 }
 
-                meshCollider.convex = false;
+                meshCollider.convex = true;
 
                 SkinnedMeshColliderSync sync = skinnedMeshRenderer.GetComponent<SkinnedMeshColliderSync>();
                 if (sync == null)
