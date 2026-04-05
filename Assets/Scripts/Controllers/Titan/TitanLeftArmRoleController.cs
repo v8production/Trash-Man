@@ -11,6 +11,7 @@ namespace Titan
     public class TitanLeftArmRoleController : MonoBehaviour, ITitanRoleController
     {
         [SerializeField] private TitanRig rig;
+        [SerializeField] private TitanInputAggregationManager inputAggregationManager;
         [Header("Shoulder Mouse Mapping")]
         [SerializeField] private float maxThetaDegrees = 55f;
         [SerializeField] private float thetaRadiusPixels = 260f;
@@ -34,6 +35,7 @@ namespace Titan
         private void Awake()
         {
             rig ??= GetComponent<TitanRig>();
+            inputAggregationManager ??= GetComponent<TitanInputAggregationManager>();
         }
 
         public void TickRoleInput(float deltaTime)
@@ -43,7 +45,9 @@ namespace Titan
                 return;
             }
 
-            Vector2 mousePosition = TitanInputUtility.ReadMousePosition();
+            Vector2 mousePosition = inputAggregationManager != null
+                ? inputAggregationManager.Current.MousePosition
+                : TitanInputUtility.ReadMousePosition();
             Vector2 origin = useScreenCenterAsOrigin
                 ? new Vector2(Screen.width * 0.5f, Screen.height * 0.5f)
                 : mouseOriginPixels;
@@ -62,7 +66,9 @@ namespace Titan
             shoulderYaw = Mathf.Lerp(shoulderYaw, targetYaw, blend);
             shoulderPitch = Mathf.Lerp(shoulderPitch, targetPitch, blend);
 
-            float elbowInput = TitanInputUtility.GetAxis(KeyCode.W, KeyCode.S, Key.W, Key.S);
+            float elbowInput = inputAggregationManager != null
+                ? inputAggregationManager.Current.LeftArmElbow
+                : TitanInputUtility.GetAxis(KeyCode.W, KeyCode.S, Key.W, Key.S);
 
             shoulderPitch = Mathf.Clamp(shoulderPitch, shoulderPitchLimit.x, shoulderPitchLimit.y);
             shoulderYaw = Mathf.Clamp(shoulderYaw, shoulderYawLimit.x, shoulderYawLimit.y);

@@ -66,6 +66,11 @@ namespace Titan
                 target.AddComponent<TitanRig>();
             }
 
+            if (target.GetComponent<TitanInputAggregationManager>() == null)
+            {
+                target.AddComponent<TitanInputAggregationManager>();
+            }
+
             if (target.GetComponent<TitanBodyRoleController>() == null)
             {
                 target.AddComponent<TitanBodyRoleController>();

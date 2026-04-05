@@ -11,6 +11,7 @@ namespace Titan
     public class TitanBodyRoleController : MonoBehaviour, ITitanRoleController
     {
         [SerializeField] private TitanRig rig;
+        [SerializeField] private TitanInputAggregationManager inputAggregationManager;
 
         [Header("Body Input")]
         [SerializeField] private float moveSpeed = 3.5f;
@@ -65,6 +66,7 @@ namespace Titan
         private void Awake()
         {
             rig ??= GetComponent<TitanRig>();
+            inputAggregationManager ??= GetComponent<TitanInputAggregationManager>();
             if (rig != null)
             {
                 Transform movementRoot = rig.MovementRoot;
@@ -96,29 +98,20 @@ namespace Titan
                 return;
             }
 
-            forwardInput = TitanInputUtility.GetAxis(
-                KeyCode.UpArrow,
-                KeyCode.DownArrow,
-                Key.UpArrow,
-                Key.DownArrow);
+            if (inputAggregationManager != null)
+            {
+                TitanAggregatedInput input = inputAggregationManager.Current;
+                forwardInput = input.BodyForward;
+                strafeInput = input.BodyStrafe;
+                turnInput = input.BodyTurn;
+                UpdateWaistRotation(input.BodyWaist, deltaTime);
+                return;
+            }
 
-            strafeInput = TitanInputUtility.GetAxis(
-                KeyCode.RightArrow,
-                KeyCode.LeftArrow,
-                Key.RightArrow,
-                Key.LeftArrow);
-
-            turnInput = TitanInputUtility.GetAxis(
-                KeyCode.Period,
-                KeyCode.Comma,
-                Key.Period,
-                Key.Comma);
-
-            float waistInput = TitanInputUtility.GetAxis(
-                KeyCode.D,
-                KeyCode.A,
-                Key.D,
-                Key.A);
+            forwardInput = TitanInputUtility.GetAxis(KeyCode.UpArrow, KeyCode.DownArrow, Key.UpArrow, Key.DownArrow);
+            strafeInput = TitanInputUtility.GetAxis(KeyCode.RightArrow, KeyCode.LeftArrow, Key.RightArrow, Key.LeftArrow);
+            turnInput = TitanInputUtility.GetAxis(KeyCode.Period, KeyCode.Comma, Key.Period, Key.Comma);
+            float waistInput = TitanInputUtility.GetAxis(KeyCode.D, KeyCode.A, Key.D, Key.A);
 
             UpdateWaistRotation(waistInput, deltaTime);
         }

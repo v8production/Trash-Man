@@ -22,6 +22,7 @@ namespace Titan
         [SerializeField] private TitanRightArmRoleController rightArmController;
         [SerializeField] private TitanLeftLegRoleController leftLegController;
         [SerializeField] private TitanRightLegRoleController rightLegController;
+        [SerializeField] private TitanInputAggregationManager inputAggregationManager;
 
         public TitanRole ActiveRole => activeRole;
 
@@ -37,6 +38,7 @@ namespace Titan
             rightArmController ??= GetComponent<TitanRightArmRoleController>();
             leftLegController ??= GetComponent<TitanLeftLegRoleController>();
             rightLegController ??= GetComponent<TitanRightLegRoleController>();
+            inputAggregationManager ??= GetComponent<TitanInputAggregationManager>();
 
             if (disableAnimatorWhileTesting)
             {
@@ -66,6 +68,8 @@ namespace Titan
             }
 
             float deltaTime = Time.fixedDeltaTime;
+            inputAggregationManager?.Capture();
+
             if (bodyController != null)
             {
                 bool bodyRoleActive = activeRole == TitanRole.Body;
