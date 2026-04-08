@@ -22,6 +22,7 @@ public class Managers : MonoBehaviour
     SceneManagerEx _sceneManager = new();
     SoundManager _soundManager = new();
     UIManager _uiManager = new();
+    DiscordManager _discordManager = new();
     public static DataManager Data { get { return Instance._dataManager; } }
     public static InputManager Input { get { return Instance._inputManager; } }
     public static PoolManager Pool { get { return Instance._poolManager; } }
@@ -29,6 +30,7 @@ public class Managers : MonoBehaviour
     public static SceneManagerEx Scene { get { return Instance._sceneManager; } }
     public static SoundManager Sound { get { return Instance._soundManager; } }
     public static UIManager UI { get { return Instance._uiManager; } }
+    public static DiscordManager Discord { get { return Instance._discordManager; } }
     #endregion
 
     void Start()
@@ -61,6 +63,7 @@ public class Managers : MonoBehaviour
             _instance._poolManager.Init();
             _instance._soundManager.Init();
             _instance._titanRigManager.Init();
+            _instance._discordManager.Init();
         }
     }
 
@@ -74,5 +77,6 @@ public class Managers : MonoBehaviour
         Chat.Clear();
         Pool.Clear();
         TitanRig.Clear();
+        Discord.Clear();
     }
 }
