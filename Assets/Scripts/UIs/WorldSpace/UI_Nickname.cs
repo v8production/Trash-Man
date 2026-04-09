@@ -1,43 +1,114 @@
+using System;
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
 public class UI_Nickname : UI_Base
 {
-    private Text _label;
+    [SerializeField] private Vector3 worldOffset = Vector3.zero;
+    [SerializeField] private Vector2 canvasOffset = Vector2.zero;
+
+    private string _text;
+    private Transform _target;
+    private Transform _anchorTarget;
+    private RectTransform _selfRect;
+    private RectTransform _textRect;
+    private TextMeshProUGUI _textComponent;
+
+    enum Texts
+    {
+        Text,
+    }
 
     public override void Init()
     {
-        _label = Util.FindChild<Text>(gameObject, "Label", true);
-        if (_label == null)
-            _label = CreateFallbackLabel();
+        _target = transform.parent;
 
-        SetNickname("Player");
+        transform.SetParent(Managers.UI._root.transform, false);
+        Managers.UI.ShowCanvas(gameObject, false);
+
+        _selfRect = gameObject.GetComponent<RectTransform>();
+        Bind<TextMeshProUGUI>(typeof(Texts));
+        _textComponent = Get<TextMeshProUGUI>((int)Texts.Text);
+        _textRect = _textComponent != null ? _textComponent.rectTransform : null;
+        _textComponent.text = _text;
     }
 
-    public void SetNickname(string nickname)
+    void LateUpdate()
     {
-        if (_label == null)
+        if (_target == null || _textRect == null)
+        {
+            Hide();
             return;
+        }
 
-        _label.text = string.IsNullOrWhiteSpace(nickname) ? "Player" : nickname;
+        Camera cam = Camera.main;
+        if (cam == null)
+        {
+            Hide();
+            return;
+        }
+
+        Transform anchorTarget = _anchorTarget != null ? _anchorTarget : _target;
+        Vector3 worldAnchor = GetTargetCenter(anchorTarget) + worldOffset;
+        Vector3 screenPoint = cam.WorldToScreenPoint(worldAnchor);
+
+        if (screenPoint.z <= 0f)
+        {
+            Hide();
+            return;
+        }
+
+        RectTransform parentRect = _textRect.parent as RectTransform;
+        if (parentRect != null && RectTransformUtility.ScreenPointToLocalPointInRectangle(parentRect, screenPoint, null, out Vector2 localPoint))
+            _textRect.anchoredPosition = localPoint + canvasOffset;
+        else
+            _textRect.position = screenPoint + (Vector3)canvasOffset;
+
+        if (_textComponent != null)
+            _textComponent.text = _text;
     }
 
-    private Text CreateFallbackLabel()
+    public void SetText(string text)
     {
-        GameObject textObject = new("Label");
-        textObject.transform.SetParent(transform, false);
-
-        RectTransform rectTransform = textObject.GetorAddComponent<RectTransform>();
-        rectTransform.anchorMin = Vector2.zero;
-        rectTransform.anchorMax = Vector2.one;
-        rectTransform.offsetMin = Vector2.zero;
-        rectTransform.offsetMax = Vector2.zero;
-
-        Text text = textObject.GetorAddComponent<Text>();
-        text.alignment = TextAnchor.MiddleCenter;
-        text.color = Color.white;
-        text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-        text.fontSize = 20;
-        return text;
+        _text = text;
+        if (_textComponent != null)
+            _textComponent.text = _text;
     }
+
+    public void SetAnchorTarget(Transform anchorTarget)
+    {
+        _anchorTarget = anchorTarget;
+    }
+
+    public void Hide() => gameObject.SetActive(false);
+    public void Show() => gameObject.SetActive(true);
+
+    private static Vector3 GetTargetCenter(Transform target)
+    {
+        if (target == null)
+            return Vector3.zero;
+
+        if (target.TryGetComponent(out IInteractGuideAnchorProvider anchorProvider))
+            return anchorProvider.GetInteractGuideAnchorWorldPosition();
+
+        Collider collider = target.GetComponent<Collider>();
+        if (collider != null)
+            return collider.bounds.center;
+
+        Collider colliderInChildren = target.GetComponentInChildren<Collider>();
+        if (colliderInChildren != null)
+            return colliderInChildren.bounds.center;
+
+        Renderer renderer = target.GetComponentInChildren<Renderer>();
+        if (renderer != null)
+            return renderer.bounds.center;
+
+        return target.position;
+    }
+}
+
+public interface IInteractGuideAnchorProvider
+{
+    Vector3 GetInteractGuideAnchorWorldPosition();
 }

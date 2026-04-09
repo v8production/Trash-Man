@@ -73,7 +73,7 @@ public class UI_Intro : UI_Scene
 
     private void OnNewGameButtonClicked(PointerEventData eventData)
     {
-        Managers.Scene.LoadScene(Define.Scene.Lobby);
+        Managers.Scene.LoadLobbyAsHost();
     }
 
     private void OnJoinButtonClicked(PointerEventData eventData)

@@ -1,6 +1,6 @@
 {
   "dependencies": {
-    "com.discord.partnersdk": "file:C:/Users/2gang/Downloads/DiscordSocialSdk-UnityPlugin-1.8.14985/com.discord.partnersdk",
+    "com.discord.partnersdk": "file:com.discord.partnersdk",
     "com.unity.2d.sprite": "1.0.0",
     "com.unity.ai.navigation": "2.0.10",
     "com.unity.collab-proxy": "2.11.3",

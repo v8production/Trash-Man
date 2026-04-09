@@ -48,3 +48,6 @@ AGENTS.md
 # Local secrets / env
 .env
 .env.*
+
+# Local third-party SDKs (not for VCS)
+Packages/com.discord.partnersdk/
