@@ -3,7 +3,7 @@ using UnityEngine;
 
 public class UIManager
 {
-    int _order = 0;
+    int _order = 1;
 
     UI_Scene _scene = null;
 

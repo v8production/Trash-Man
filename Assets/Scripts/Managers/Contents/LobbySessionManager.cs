@@ -114,6 +114,15 @@ public class LobbySessionManager
         return trimmed.Length == JoinCodeLength ? trimmed : string.Empty;
     }
 
+    public bool HasJoinCode(string rawJoinCode)
+    {
+        string joinCode = NormalizeJoinCode(rawJoinCode);
+        if (string.IsNullOrWhiteSpace(joinCode))
+            return false;
+
+        return s_roomByJoinCode.ContainsKey(joinCode);
+    }
+
     public bool JoinLobbyByCode(string rawJoinCode)
     {
         string joinCode = NormalizeJoinCode(rawJoinCode);
@@ -246,6 +255,7 @@ public class LobbySessionManager
         _currentHostAddress = string.IsNullOrWhiteSpace(hostAddress) ? ResolveConfiguredHostAddress() : hostAddress;
         _currentVoiceSecret = voiceSecret;
         GUIUtility.systemCopyBuffer = CurrentJoinCode;
+        Managers.Toast.EnqueueMessage("Enter code is copied on clipboard.", 2.5f);
 
         LobbyRoomData room = new()
         {

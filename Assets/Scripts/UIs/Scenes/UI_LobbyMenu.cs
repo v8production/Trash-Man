@@ -60,7 +60,7 @@ public class UI_LobbyMenu : UI_Scene
 
     private void OnSystemSettingsButtonClicked(PointerEventData eventData)
     {
-        Managers.Chat.EnqueueMessage("System settings UI is not ready yet.", 2.5f);
+        Managers.Toast.EnqueueMessage("System settings UI is not ready yet.", 2.5f);
     }
 
     private void OnShowCodeButtonClicked(PointerEventData eventData)
@@ -73,24 +73,24 @@ public class UI_LobbyMenu : UI_Scene
     {
         if (!Managers.Discord.IsLinked)
         {
-            Managers.Chat.EnqueueMessage("Connect Discord before inviting a friend.", 2.5f);
+            Managers.Toast.EnqueueMessage("Connect Discord before inviting a friend.", 2.5f);
             return;
         }
 
-        string joinCode = Managers.Lobby.CurrentJoinCode;
+        string joinCode = Managers.LobbySession.CurrentJoinCode;
         if (string.IsNullOrWhiteSpace(joinCode))
         {
-            Managers.Chat.EnqueueMessage("Lobby code is not ready yet.", 2.5f);
+            Managers.Toast.EnqueueMessage("Lobby code is not ready yet.", 2.5f);
             return;
         }
 
         Managers.Discord.RequestLobbyInvite(joinCode);
-        Managers.Chat.EnqueueMessage($"Invite sent. Code: {joinCode}", 2.5f);
+        Managers.Toast.EnqueueMessage($"Invite sent. Code: {joinCode}", 2.5f);
     }
 
     private void OnQuitRoomButtonClicked(PointerEventData eventData)
     {
-        Managers.Lobby.QuitCurrentRoom();
+        Managers.LobbySession.QuitCurrentRoom();
         Managers.Scene.LoadScene(Define.Scene.Intro);
     }
 
@@ -99,7 +99,7 @@ public class UI_LobbyMenu : UI_Scene
         TextMeshProUGUI showCodeText = Get<TextMeshProUGUI>((int)Texts.ShowCode);
         TextMeshProUGUI codeText = Get<TextMeshProUGUI>((int)Texts.Code);
 
-        string joinCode = Managers.Lobby.CurrentJoinCode;
+        string joinCode = Managers.LobbySession.CurrentJoinCode;
         bool canRevealCode = !string.IsNullOrWhiteSpace(joinCode);
 
         if (showCodeText != null)

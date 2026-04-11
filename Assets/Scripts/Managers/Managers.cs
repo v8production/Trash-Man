@@ -7,12 +7,14 @@ public class Managers : MonoBehaviour
 
     #region Contents
     GameStateManager _gameStateManager = new();
-    ChatMessageManager _chatMessageManager = new();
+    ChatManager _chatManager = new();
+    ToastManager _toastManager = new();
     LobbySessionManager _lobbySessionManager = new();
     TitanRigManager _titanRigManager = TitanRigManager.Instance;
     public static GameStateManager GameState { get { return Instance._gameStateManager; } }
-    public static ChatMessageManager Chat { get { return Instance._chatMessageManager; } }
-    public static LobbySessionManager Lobby { get { return Instance._lobbySessionManager; } }
+    public static ChatManager Chat { get { return Instance._chatManager; } }
+    public static ToastManager Toast { get { return Instance._toastManager; } }
+    public static LobbySessionManager LobbySession { get { return Instance._lobbySessionManager; } }
     public static TitanRigManager TitanRig { get { return Instance._titanRigManager; } }
     #endregion
 
@@ -42,9 +44,10 @@ public class Managers : MonoBehaviour
 
     void Update()
     {
-        _chatMessageManager.OnUpdate();
-        _lobbySessionManager.OnUpdate();
-        _discordManager.OnUpdate();
+        Chat.OnUpdate();
+        Toast.OnUpdate();
+        LobbySession.OnUpdate();
+        Discord.OnUpdate();
     }
 
     static void Init()
@@ -64,7 +67,8 @@ public class Managers : MonoBehaviour
             _instance._dataManager.Init();
             _instance._sceneManager.Init();
             _instance._gameStateManager.Init();
-            _instance._chatMessageManager.Init();
+            _instance._chatManager.Init();
+            _instance._toastManager.Init();
             _instance._lobbySessionManager.Init();
             _instance._poolManager.Init();
             _instance._soundManager.Init();
@@ -81,7 +85,8 @@ public class Managers : MonoBehaviour
 
         GameState.Clear();
         Chat.Clear();
-        Lobby.Clear();
+        Toast.Clear();
+        LobbySession.Clear();
         Pool.Clear();
         TitanRig.Clear();
         Discord.Clear();

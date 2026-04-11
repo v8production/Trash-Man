@@ -278,7 +278,7 @@ public class DiscordManager
 
         _voiceChatActiveByUserId[userId] = isActive;
         LogVoice($"Speaking state changed. userId={userId}, speaking={isActive}");
-        Managers.Lobby.SetRangerNicknameVoiceActive(userId, isActive);
+        Managers.LobbySession.SetRangerNicknameVoiceActive(userId, isActive);
         OnLobbyUserVoiceChatStateChanged?.Invoke(userId, isActive);
     }
 

@@ -62,10 +62,10 @@ public class LobbyScene : BaseScene
         EnsureLobbyMenu();
 
         if (Managers.Scene.ConsumeLobbyHostRequest())
-            Managers.Lobby.BootstrapLocalHostLobby();
+            Managers.LobbySession.BootstrapLocalHostLobby();
         else if (Managers.Scene.ConsumeLobbyJoinCodeRequest(out string joinCode))
         {
-            if (!Managers.Lobby.JoinLobbyByCode(joinCode))
+            if (!Managers.LobbySession.JoinLobbyByCode(joinCode))
             {
                 Managers.Chat.EnqueueMessage("Failed to join lobby with that code.", 2.5f);
                 Managers.Scene.LoadScene(Define.Scene.Intro);
@@ -160,7 +160,7 @@ public class LobbyScene : BaseScene
 
     private static string GetLobbyVoiceSecret()
     {
-        string activeVoiceSecret = Managers.Lobby.CurrentVoiceSecret;
+        string activeVoiceSecret = Managers.LobbySession.CurrentVoiceSecret;
         if (!string.IsNullOrWhiteSpace(activeVoiceSecret))
             return activeVoiceSecret;
 
@@ -168,7 +168,7 @@ public class LobbyScene : BaseScene
         if (!string.IsNullOrWhiteSpace(configuredSecret))
             return configuredSecret.Trim();
 
-        string joinCode = Managers.Lobby.CurrentJoinCode;
+        string joinCode = Managers.LobbySession.CurrentJoinCode;
         if (!string.IsNullOrWhiteSpace(joinCode))
             return $"trash-man-lobby-{joinCode.Trim().ToLowerInvariant()}";
 

@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-public class ChatMessageManager
+public class ChatManager
 {
     private const float OnceKeyRetentionSeconds = 180f;
 
