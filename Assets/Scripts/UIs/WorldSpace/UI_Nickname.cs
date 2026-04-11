@@ -5,8 +5,18 @@ using UnityEngine.UI;
 
 public class UI_Nickname : UI_Base
 {
-    private const string SpeakerGlyph = "🔊";
-    private const float SpeakerWidth = 28f;
+
+    enum Images
+    {
+        Speaker,
+    }
+
+    enum Texts
+    {
+        Nickname,
+    }
+
+    private const float DefaultSpeakerWidth = 28f;
     private const float SpeakerGap = 6f;
 
     [SerializeField] private Vector3 worldOffset = Vector3.zero;
@@ -19,13 +29,8 @@ public class UI_Nickname : UI_Base
     private RectTransform _textRect;
     private TextMeshProUGUI _textComponent;
     private RectTransform _speakerRect;
-    private TextMeshProUGUI _speakerComponent;
+    private Image _speakerImage;
     private bool _isVoiceChatActive;
-
-    enum Texts
-    {
-        Text,
-    }
 
     public override void Init()
     {
@@ -36,12 +41,17 @@ public class UI_Nickname : UI_Base
 
         _selfRect = gameObject.GetComponent<RectTransform>();
         Bind<TextMeshProUGUI>(typeof(Texts));
-        _textComponent = Get<TextMeshProUGUI>((int)Texts.Text);
+        Bind<Image>(typeof(Images));
+        _textComponent = GetText((int)Texts.Nickname);
         _textRect = _textComponent != null ? _textComponent.rectTransform : null;
-        _speakerComponent = EnsureSpeakerComponent();
-        _speakerRect = _speakerComponent != null ? _speakerComponent.rectTransform : null;
-        _textComponent.text = _text;
+        _speakerImage = GetImage((int)Images.Speaker);
+        _speakerRect = _speakerImage != null ? _speakerImage.rectTransform : null;
+
+        if (_textComponent != null)
+            _textComponent.text = _text;
+
         ApplyVoiceChatState();
+        UpdateSpeakerPosition();
     }
 
     void LateUpdate()
@@ -107,45 +117,12 @@ public class UI_Nickname : UI_Base
     public void Hide() => gameObject.SetActive(false);
     public void Show() => gameObject.SetActive(true);
 
-    private TextMeshProUGUI EnsureSpeakerComponent()
-    {
-        Transform existingSpeaker = transform.Find("Speaker");
-        if (existingSpeaker != null)
-            return existingSpeaker.GetComponent<TextMeshProUGUI>();
-
-        if (_textComponent == null)
-            return null;
-
-        GameObject speakerObject = new("Speaker", typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
-        speakerObject.transform.SetParent(_textComponent.transform.parent, false);
-
-        TextMeshProUGUI speaker = speakerObject.GetComponent<TextMeshProUGUI>();
-        speaker.text = SpeakerGlyph;
-        speaker.font = _textComponent.font;
-        speaker.fontSharedMaterial = _textComponent.fontSharedMaterial;
-        speaker.fontSize = Mathf.Max(18f, _textComponent.fontSize * 0.85f);
-        speaker.color = _textComponent.color;
-        speaker.raycastTarget = false;
-        speaker.alignment = TextAlignmentOptions.Center;
-        speaker.enableWordWrapping = false;
-        speaker.overflowMode = TextOverflowModes.Overflow;
-
-        RectTransform rect = speaker.rectTransform;
-        rect.anchorMin = new Vector2(0.5f, 0.5f);
-        rect.anchorMax = new Vector2(0.5f, 0.5f);
-        rect.pivot = new Vector2(0.5f, 0.5f);
-        rect.sizeDelta = new Vector2(SpeakerWidth, _textRect != null ? _textRect.sizeDelta.y : SpeakerWidth);
-
-        return speaker;
-    }
-
     private void ApplyVoiceChatState()
     {
-        if (_speakerComponent == null)
+        if (_speakerImage == null)
             return;
 
-        _speakerComponent.text = SpeakerGlyph;
-        _speakerComponent.gameObject.SetActive(_isVoiceChatActive);
+        _speakerImage.gameObject.SetActive(_isVoiceChatActive);
     }
 
     private void UpdateSpeakerPosition()
@@ -153,9 +130,16 @@ public class UI_Nickname : UI_Base
         if (_speakerRect == null || _textRect == null)
             return;
 
+        if (_textComponent == null)
+            return;
+
         _textComponent.ForceMeshUpdate();
         float preferredWidth = Mathf.Max(_textComponent.preferredWidth, _textRect.rect.width);
-        float speakerX = _textRect.anchoredPosition.x - (preferredWidth * 0.5f) - SpeakerGap - (SpeakerWidth * 0.5f);
+        float speakerWidth = _speakerRect.rect.width > 0f ? _speakerRect.rect.width : _speakerRect.sizeDelta.x;
+        if (speakerWidth <= 0f)
+            speakerWidth = DefaultSpeakerWidth;
+
+        float speakerX = _textRect.anchoredPosition.x - (preferredWidth * 0.5f) - SpeakerGap - (speakerWidth * 0.5f);
         _speakerRect.anchoredPosition = new Vector2(speakerX, _textRect.anchoredPosition.y);
     }
 

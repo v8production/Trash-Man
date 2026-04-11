@@ -1,3 +1,4 @@
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -32,7 +33,7 @@ public class UI_Chat : UI_Scene
         base.Init();
 
         Bind<GameObject>(typeof(GameObjects));
-        Bind<Text>(typeof(Texts));
+        Bind<TextMeshProUGUI>(typeof(Texts));
 
         GameObject bubble = GetObject((int)GameObjects.Bubble);
         if (bubble != null)
@@ -49,7 +50,7 @@ public class UI_Chat : UI_Scene
         if (!_isInitialized)
             Init();
 
-        Text messageText = GetText((int)Texts.MessageText);
+        TextMeshProUGUI messageText = GetText((int)Texts.MessageText);
         if (messageText == null)
             return;
 

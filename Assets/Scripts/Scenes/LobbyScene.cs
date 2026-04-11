@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.InputSystem;
 
 public class LobbyScene : BaseScene
 {
@@ -26,7 +27,7 @@ public class LobbyScene : BaseScene
 
     private void Update()
     {
-        if (!Input.GetKeyDown(KeyCode.Escape))
+        if (!IsEscapePressedThisFrame())
             return;
 
         ToggleLobbyMenu();
@@ -65,6 +66,12 @@ public class LobbyScene : BaseScene
 
         bool shouldShow = !_lobbyMenu.gameObject.activeSelf;
         _lobbyMenu.gameObject.SetActive(shouldShow);
+        Managers.Input.SetMode(shouldShow ? Define.InputMode.UI : Define.InputMode.Player);
+    }
+
+    private static bool IsEscapePressedThisFrame()
+    {
+        return Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame;
     }
 
     private void TryAutoConnectLobbyVoice()
