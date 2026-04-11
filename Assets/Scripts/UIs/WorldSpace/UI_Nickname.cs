@@ -6,18 +6,19 @@ using UnityEngine.UI;
 public class UI_Nickname : UI_Base
 {
 
-    enum Images
-    {
-        Speaker,
-    }
-
     enum Texts
     {
         Nickname,
     }
 
+    enum Images
+    {
+        Speaker,
+    }
+
     private const float DefaultSpeakerWidth = 28f;
     private const float SpeakerGap = 6f;
+    private const float NicknameHorizontalPadding = 12f;
 
     [SerializeField] private Vector3 worldOffset = Vector3.zero;
     [SerializeField] private Vector2 canvasOffset = Vector2.zero;
@@ -46,18 +47,22 @@ public class UI_Nickname : UI_Base
         _textRect = _textComponent != null ? _textComponent.rectTransform : null;
         _speakerImage = GetImage((int)Images.Speaker);
         _speakerRect = _speakerImage != null ? _speakerImage.rectTransform : null;
-        EnsureSpeakerRenderable();
 
         if (_textComponent != null)
+        {
+            _textComponent.textWrappingMode = TextWrappingModes.NoWrap;
+            _textComponent.overflowMode = TextOverflowModes.Overflow;
             _textComponent.text = _text;
+        }
 
         ApplyVoiceChatState();
+        UpdateNicknameWidth();
         UpdateSpeakerPosition();
     }
 
     void LateUpdate()
     {
-        if (_target == null || _textRect == null)
+        if (_target == null || _selfRect == null)
         {
             Hide();
             return;
@@ -71,7 +76,7 @@ public class UI_Nickname : UI_Base
         }
 
         Transform anchorTarget = _anchorTarget != null ? _anchorTarget : _target;
-        Vector3 worldAnchor = GetTargetCenter(anchorTarget) + worldOffset;
+        Vector3 worldAnchor = GetTargetTop(anchorTarget) + worldOffset;
         Vector3 screenPoint = cam.WorldToScreenPoint(worldAnchor);
 
         if (screenPoint.z <= 0f)
@@ -80,11 +85,11 @@ public class UI_Nickname : UI_Base
             return;
         }
 
-        RectTransform parentRect = _textRect.parent as RectTransform;
+        RectTransform parentRect = _selfRect.parent as RectTransform;
         if (parentRect != null && RectTransformUtility.ScreenPointToLocalPointInRectangle(parentRect, screenPoint, null, out Vector2 localPoint))
-            _textRect.anchoredPosition = localPoint + canvasOffset;
+            _selfRect.anchoredPosition = localPoint + canvasOffset;
         else
-            _textRect.position = screenPoint + (Vector3)canvasOffset;
+            _selfRect.position = screenPoint + (Vector3)canvasOffset;
 
         if (_textComponent != null)
         {
@@ -99,6 +104,7 @@ public class UI_Nickname : UI_Base
         if (_textComponent != null)
         {
             _textComponent.text = _text;
+            UpdateNicknameWidth();
             UpdateSpeakerPosition();
         }
     }
@@ -126,28 +132,6 @@ public class UI_Nickname : UI_Base
         _speakerImage.gameObject.SetActive(_isVoiceChatActive);
     }
 
-    private void EnsureSpeakerRenderable()
-    {
-        if (_speakerImage == null)
-            return;
-
-        if (_speakerImage.sprite != null)
-            return;
-
-        Sprite fallbackSprite = Resources.GetBuiltinResource<Sprite>("UI/Skin/UISprite.psd");
-        if (fallbackSprite == null)
-        {
-            Debug.LogWarning("[LobbyVoice] UI_Nickname Speaker image has no sprite and fallback sprite is unavailable.");
-            return;
-        }
-
-        _speakerImage.sprite = fallbackSprite;
-        _speakerImage.type = Image.Type.Simple;
-        _speakerImage.preserveAspect = true;
-        _speakerImage.raycastTarget = false;
-        Debug.LogWarning("[LobbyVoice] UI_Nickname Speaker image had no sprite. Applied built-in fallback sprite.");
-    }
-
     private void UpdateSpeakerPosition()
     {
         if (_speakerRect == null || _textRect == null)
@@ -166,25 +150,34 @@ public class UI_Nickname : UI_Base
         _speakerRect.anchoredPosition = new Vector2(speakerX, _textRect.anchoredPosition.y);
     }
 
-    private static Vector3 GetTargetCenter(Transform target)
+    private void UpdateNicknameWidth()
+    {
+        if (_textRect == null || _textComponent == null)
+            return;
+
+        _textComponent.ForceMeshUpdate();
+        float preferredWidth = Mathf.Max(0f, _textComponent.preferredWidth);
+        Vector2 size = _textRect.sizeDelta;
+        size.x = preferredWidth + NicknameHorizontalPadding;
+        _textRect.sizeDelta = size;
+    }
+
+    private static Vector3 GetTargetTop(Transform target)
     {
         if (target == null)
             return Vector3.zero;
 
-        if (target.TryGetComponent(out IInteractGuideAnchorProvider anchorProvider))
-            return anchorProvider.GetInteractGuideAnchorWorldPosition();
-
         Collider collider = target.GetComponent<Collider>();
         if (collider != null)
-            return collider.bounds.center;
+            return collider.bounds.center + Vector3.up * collider.bounds.extents.y;
 
         Collider colliderInChildren = target.GetComponentInChildren<Collider>();
         if (colliderInChildren != null)
-            return colliderInChildren.bounds.center;
+            return colliderInChildren.bounds.center + Vector3.up * colliderInChildren.bounds.extents.y;
 
         Renderer renderer = target.GetComponentInChildren<Renderer>();
         if (renderer != null)
-            return renderer.bounds.center;
+            return renderer.bounds.center + Vector3.up * renderer.bounds.extents.y;
 
         return target.position;
     }
