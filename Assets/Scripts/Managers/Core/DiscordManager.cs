@@ -58,11 +58,14 @@ public class DiscordManager
 
     public void Init()
     {
+        LogVoice("Init called. Ensuring Discord client instance.");
         _ = EnsureClient();
     }
 
     public void Connect(ulong applicationId, string scopes)
     {
+        LogVoice($"Connect requested. appId={applicationId}, scopes={(string.IsNullOrWhiteSpace(scopes) ? "<default>" : scopes)}, linked={IsLinked}, connecting={IsConnecting}");
+
         if (applicationId == 0)
         {
             SetConnectFailed("Discord connect failed: invalid application id.");
@@ -70,10 +73,16 @@ public class DiscordManager
         }
 
         if (IsLinked || IsConnecting)
+        {
+            LogVoice($"Connect request ignored. linked={IsLinked}, connecting={IsConnecting}");
             return;
+        }
 
         if (!EnsureClient())
+        {
+            LogVoice("Connect aborted because Discord client is unavailable.");
             return;
+        }
 
         _applicationId = applicationId;
         _scopes = string.IsNullOrWhiteSpace(scopes) ? DefaultScopes : scopes;
@@ -88,6 +97,7 @@ public class DiscordManager
 
         try
         {
+            LogVoice("Starting Discord authorization flow.");
             verifier = InvokeInstance(_client, "CreateAuthorizationCodeVerifier");
             _pendingCodeVerifier = InvokeInstance(verifier, "Verifier") as string;
             challenge = InvokeInstance(verifier, "Challenge");
@@ -106,6 +116,7 @@ public class DiscordManager
 
             Delegate authorizeCallback = CreateClientCallback("AuthorizationCallback", HandleAuthorizeResultBridge);
             InvokeInstance(_client, "Authorize", authArgs, authorizeCallback);
+            LogVoice("Authorize request dispatched to Discord SDK.");
         }
         catch (Exception e)
         {
@@ -147,7 +158,7 @@ public class DiscordManager
         _members[LocalUserId] = localUser;
         _voiceChatActiveByUserId[LocalUserId] = false;
 
-        Debug.Log($"Discord link success: username={LocalDisplayName}");
+        LogVoice($"Discord link success. userId={LocalUserId}, username={LocalDisplayName}");
         OnAuthStateChanged?.Invoke();
         OnLocalDisplayNameChanged?.Invoke(LocalDisplayName);
         OnLobbyUserJoined?.Invoke(localUser);
@@ -197,22 +208,37 @@ public class DiscordManager
             return;
 
         _voiceChatActiveByUserId[userId] = isActive;
+        LogVoice($"Speaking state changed. userId={userId}, speaking={isActive}");
         OnLobbyUserVoiceChatStateChanged?.Invoke(userId, isActive);
     }
 
     public void EnsureLobbyVoiceConnected(string lobbySecret)
     {
+        LogVoice($"EnsureLobbyVoiceConnected called. linked={IsLinked}, hasSecret={!string.IsNullOrWhiteSpace(lobbySecret)}, activeLobbyId={_activeVoiceLobbyId}");
+
         if (string.IsNullOrWhiteSpace(lobbySecret) || !IsLinked)
+        {
+            LogVoice($"EnsureLobbyVoiceConnected skipped. reason={(string.IsNullOrWhiteSpace(lobbySecret) ? "empty-secret" : "not-linked")}");
             return;
+        }
 
         if (!EnsureClient())
+        {
+            LogVoice("EnsureLobbyVoiceConnected aborted: Discord client unavailable.");
             return;
+        }
 
         if (_activeVoiceCall != null && string.Equals(_activeVoiceLobbySecret, lobbySecret, StringComparison.Ordinal))
+        {
+            LogVoice($"Lobby voice already connected for secret({SummarizeSecret(lobbySecret)}). Reuse existing call.");
             return;
+        }
 
         if (_activeVoiceCall != null && !string.Equals(_activeVoiceLobbySecret, lobbySecret, StringComparison.Ordinal))
+        {
+            LogVoice($"Switching lobby voice from secret({SummarizeSecret(_activeVoiceLobbySecret)}) to secret({SummarizeSecret(lobbySecret)}).");
             EndActiveLobbyVoice();
+        }
 
         _pendingVoiceLobbySecret = lobbySecret;
 
@@ -220,6 +246,7 @@ public class DiscordManager
         {
             _createOrJoinLobbyCallback = CreateMethodCallback(_client, "CreateOrJoinLobby", 2, 1, HandleCreateOrJoinLobbyBridge);
             InvokeInstance(_client, "CreateOrJoinLobby", lobbySecret, _createOrJoinLobbyCallback);
+            LogVoice($"CreateOrJoinLobby requested. secret({SummarizeSecret(lobbySecret)})");
         }
         catch (Exception e)
         {
@@ -229,6 +256,7 @@ public class DiscordManager
 
     public void EndActiveLobbyVoice()
     {
+        LogVoice($"EndActiveLobbyVoice called. activeLobbyId={_activeVoiceLobbyId}, hasCall={_activeVoiceCall != null}");
         try
         {
             if (_client != null && _activeVoiceLobbyId != 0)
@@ -255,6 +283,7 @@ public class DiscordManager
             _clientType = Type.GetType(ClientTypeName, false);
             if (_clientType == null)
             {
+                LogVoice("Discord SDK client type was not found.");
                 SetConnectFailed("Discord SDK client type not found. Import Discord Social SDK package first.");
                 return false;
             }
@@ -262,6 +291,7 @@ public class DiscordManager
             _client = Activator.CreateInstance(_clientType);
             _statusChangedCallback = CreateClientCallback("OnStatusChanged", HandleClientStatusChangedBridge);
             InvokeInstance(_client, "SetStatusChangedCallback", _statusChangedCallback);
+            LogVoice("Discord client created and status callback registered.");
             return true;
         }
         catch (Exception e)
@@ -333,6 +363,8 @@ public class DiscordManager
         string code = args.Length > 1 ? args[1] as string : null;
         string redirectUri = args.Length > 2 ? args[2] as string : null;
 
+        LogVoice($"Authorize callback received. success={IsSdkResultSuccessful(result)}, hasCode={!string.IsNullOrWhiteSpace(code)}, hasRedirect={!string.IsNullOrWhiteSpace(redirectUri)}");
+
         if (!IsSdkResultSuccessful(result))
         {
             SetConnectFailed($"Discord authorize failed: {GetSdkResultError(result)}");
@@ -349,6 +381,7 @@ public class DiscordManager
         {
             Delegate tokenCallback = CreateClientCallback("TokenExchangeCallback", HandleTokenExchangeResultBridge);
             InvokeInstance(_client, "GetToken", _applicationId, code, _pendingCodeVerifier, redirectUri, tokenCallback);
+            LogVoice("Token exchange requested.");
         }
         catch (Exception e)
         {
@@ -360,6 +393,8 @@ public class DiscordManager
     {
         object result = args.Length > 0 ? args[0] : null;
         string accessToken = args.Length > 1 ? args[1] as string : null;
+
+        LogVoice($"Token exchange callback received. success={IsSdkResultSuccessful(result)}, hasAccessToken={!string.IsNullOrWhiteSpace(accessToken)}");
 
         if (!IsSdkResultSuccessful(result) || string.IsNullOrWhiteSpace(accessToken))
         {
@@ -381,6 +416,7 @@ public class DiscordManager
             object bearer = Enum.Parse(tokenType, "Bearer");
             Delegate updateTokenCallback = CreateClientCallback("UpdateTokenCallback", HandleUpdateTokenBridge);
             InvokeInstance(_client, "UpdateToken", bearer, accessToken, updateTokenCallback);
+            LogVoice("UpdateToken requested.");
         }
         catch (Exception e)
         {
@@ -391,6 +427,7 @@ public class DiscordManager
     private void HandleUpdateTokenBridge(object[] args)
     {
         object result = args.Length > 0 ? args[0] : null;
+        LogVoice($"UpdateToken callback received. success={IsSdkResultSuccessful(result)}");
         if (!IsSdkResultSuccessful(result))
         {
             SetConnectFailed($"Discord token update failed: {GetSdkResultError(result)}");
@@ -400,6 +437,7 @@ public class DiscordManager
         try
         {
             InvokeInstance(_client, "Connect");
+            LogVoice("Discord client Connect invoked.");
         }
         catch (Exception e)
         {
@@ -412,6 +450,8 @@ public class DiscordManager
         string status = args.Length > 0 ? args[0]?.ToString() : string.Empty;
         string error = args.Length > 1 ? args[1]?.ToString() : string.Empty;
         string errorDetail = args.Length > 2 ? args[2]?.ToString() : "0";
+
+        LogVoice($"Client status changed. status={status}, error={error}, detail={errorDetail}, connecting={IsConnecting}, linked={IsLinked}");
 
         if (status == "Ready")
         {
@@ -436,6 +476,7 @@ public class DiscordManager
 
         _activeVoiceLobbyId = lobbyId;
         _activeVoiceLobbySecret = _pendingVoiceLobbySecret;
+        LogVoice($"Lobby voice join success. lobbyId={lobbyId}, secret({SummarizeSecret(_activeVoiceLobbySecret)})");
         StartOrReuseVoiceCall(lobbyId);
     }
 
@@ -447,6 +488,7 @@ public class DiscordManager
         if (userId == 0)
             return;
 
+        LogVoice($"Speaking callback received. userId={userId}, speaking={isSpeaking}");
         SetLobbyUserVoiceChatActive(userId.ToString(), isSpeaking);
     }
 
@@ -456,12 +498,20 @@ public class DiscordManager
         if (userId == 0)
             return;
 
-        if (!IsLobbyUserVoiceChatActive(userId.ToString()))
+        if (args.Length <= 1 || args[1] is not bool isInVoiceCall)
+        {
+            LogVoice($"Voice connection state callback received with unsupported payload. userId={userId}, argCount={args.Length}");
+            return;
+        }
+
+        LogVoice($"Voice connection state callback received. userId={userId}, inVoiceCall={isInVoiceCall}");
+        if (!isInVoiceCall)
             SetLobbyUserVoiceChatActive(userId.ToString(), false);
     }
 
     private void StartOrReuseVoiceCall(ulong lobbyId)
     {
+        LogVoice($"StartOrReuseVoiceCall called. lobbyId={lobbyId}");
         object call = null;
 
         try
@@ -483,6 +533,7 @@ public class DiscordManager
         }
 
         _activeVoiceCall = call;
+        LogVoice($"Voice call ready. lobbyId={lobbyId}, callType={call.GetType().Name}");
         RegisterVoiceCallCallbacks(call);
     }
 
@@ -492,6 +543,7 @@ public class DiscordManager
         {
             _callVoiceStateChangedCallback = CreateMethodCallback(call, "SetOnVoiceStateChangedCallback", 1, 0, HandleVoiceStateChangedBridge);
             InvokeInstance(call, "SetOnVoiceStateChangedCallback", _callVoiceStateChangedCallback);
+            LogVoice("Voice-state callback registered.");
         }
         catch (Exception e)
         {
@@ -502,6 +554,7 @@ public class DiscordManager
         {
             _callSpeakingStatusChangedCallback = CreateMethodCallback(call, "SetSpeakingStatusChangedCallback", 1, 0, HandleSpeakingStatusChangedBridge);
             InvokeInstance(call, "SetSpeakingStatusChangedCallback", _callSpeakingStatusChangedCallback);
+            LogVoice("Speaking-status callback registered.");
         }
         catch (Exception e)
         {
@@ -511,6 +564,7 @@ public class DiscordManager
 
     private void LinkCurrentDiscordUser()
     {
+        LogVoice("LinkCurrentDiscordUser called.");
         object user = null;
         try
         {
@@ -536,6 +590,7 @@ public class DiscordManager
 
             IsConnecting = false;
             LastAuthError = null;
+            LogVoice($"Current Discord user resolved. userId={userId}, displayName={displayName}");
             LinkLocalAccount(userId, displayName);
         }
         catch (Exception e)
@@ -658,6 +713,16 @@ public class DiscordManager
     {
         if (value is IDisposable disposable)
             disposable.Dispose();
+    }
+
+    private static void LogVoice(string message)
+    {
+        Debug.Log($"[DiscordVoice] {message}");
+    }
+
+    private static string SummarizeSecret(string secret)
+    {
+        return string.IsNullOrWhiteSpace(secret) ? "empty" : $"len={secret.Length}";
     }
 
     private void SetConnectFailed(string message)

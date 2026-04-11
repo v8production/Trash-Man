@@ -46,6 +46,7 @@ public class UI_Nickname : UI_Base
         _textRect = _textComponent != null ? _textComponent.rectTransform : null;
         _speakerImage = GetImage((int)Images.Speaker);
         _speakerRect = _speakerImage != null ? _speakerImage.rectTransform : null;
+        EnsureSpeakerRenderable();
 
         if (_textComponent != null)
             _textComponent.text = _text;
@@ -123,6 +124,28 @@ public class UI_Nickname : UI_Base
             return;
 
         _speakerImage.gameObject.SetActive(_isVoiceChatActive);
+    }
+
+    private void EnsureSpeakerRenderable()
+    {
+        if (_speakerImage == null)
+            return;
+
+        if (_speakerImage.sprite != null)
+            return;
+
+        Sprite fallbackSprite = Resources.GetBuiltinResource<Sprite>("UI/Skin/UISprite.psd");
+        if (fallbackSprite == null)
+        {
+            Debug.LogWarning("[LobbyVoice] UI_Nickname Speaker image has no sprite and fallback sprite is unavailable.");
+            return;
+        }
+
+        _speakerImage.sprite = fallbackSprite;
+        _speakerImage.type = Image.Type.Simple;
+        _speakerImage.preserveAspect = true;
+        _speakerImage.raycastTarget = false;
+        Debug.LogWarning("[LobbyVoice] UI_Nickname Speaker image had no sprite. Applied built-in fallback sprite.");
     }
 
     private void UpdateSpeakerPosition()

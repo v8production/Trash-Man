@@ -65,10 +65,10 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: 
+  m_text: "\uC548\uB155\n"
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: bf64021bf31c7fd4997e163b9b2bb731, type: 2}
-  m_sharedMaterial: {fileID: 6846015006595520808, guid: bf64021bf31c7fd4997e163b9b2bb731, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: 5d6d089a2d460f14b9669a994b34ec68, type: 2}
+  m_sharedMaterial: {fileID: 4736087993617611740, guid: 5d6d089a2d460f14b9669a994b34ec68, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []

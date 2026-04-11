@@ -14,6 +14,7 @@ public class LobbyScene : BaseScene
         base.Init();
         SceneType = Define.Scene.Lobby;
         LoadManagers();
+        LogLobbyVoice("LobbyScene initialized.");
         Managers.Input.SetMode(Define.InputMode.Player);
         EnsureLobbyMenu();
 
@@ -45,6 +46,7 @@ public class LobbyScene : BaseScene
 
     private void HandleDiscordAuthStateChanged()
     {
+        LogLobbyVoice($"Discord auth state changed. linked={Managers.Discord.IsLinked}, connecting={Managers.Discord.IsConnecting}, lastError={Managers.Discord.LastAuthError}");
         TryAutoConnectLobbyVoice();
     }
 
@@ -76,29 +78,43 @@ public class LobbyScene : BaseScene
 
     private void TryAutoConnectLobbyVoice()
     {
+        LogLobbyVoice($"TryAutoConnectLobbyVoice called. linked={Managers.Discord.IsLinked}, connecting={Managers.Discord.IsConnecting}");
+
         if (!Managers.Discord.IsLinked)
         {
             if (Managers.Discord.IsConnecting)
+            {
+                LogLobbyVoice("Auto-connect skipped because Discord is currently connecting.");
                 return;
+            }
 
             string appIdText = Util.GetEnv(DiscordApplicationIdKey);
+            LogLobbyVoice($"Resolved {DiscordApplicationIdKey} value. hasValue={!string.IsNullOrWhiteSpace(appIdText)}");
             if (!ulong.TryParse(appIdText, out ulong appId) || appId == 0)
             {
                 Debug.LogWarning($"LobbyScene: Discord auto-connect skipped - set {DiscordApplicationIdKey} in process env or .env files.");
                 return;
             }
 
+            LogLobbyVoice($"Requesting Discord connect with appId={appId}.");
             Managers.Discord.Connect(appId, string.Empty);
             return;
         }
 
-        Managers.Discord.EnsureLobbyVoiceConnected(GetLobbyVoiceSecret());
+        string lobbyVoiceSecret = GetLobbyVoiceSecret();
+        LogLobbyVoice($"Discord already linked. Ensuring lobby voice connection. secretLen={lobbyVoiceSecret.Length}");
+        Managers.Discord.EnsureLobbyVoiceConnected(lobbyVoiceSecret);
     }
 
     private static string GetLobbyVoiceSecret()
     {
         string configuredSecret = Util.GetEnv(DiscordLobbyVoiceSecretKey);
         return string.IsNullOrWhiteSpace(configuredSecret) ? DefaultLobbyVoiceSecret : configuredSecret.Trim();
+    }
+
+    private static void LogLobbyVoice(string message)
+    {
+        Debug.Log($"[LobbyVoice] {message}");
     }
 
 

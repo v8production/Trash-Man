@@ -24,6 +24,7 @@ public class LobbySessionManager
         Managers.Discord.OnLocalDisplayNameChanged += HandleLocalDisplayNameChanged;
         Managers.Discord.OnLobbyUserVoiceChatStateChanged -= HandleLobbyUserVoiceChatStateChanged;
         Managers.Discord.OnLobbyUserVoiceChatStateChanged += HandleLobbyUserVoiceChatStateChanged;
+        Debug.Log("[LobbyVoice] LobbySessionManager subscribed to lobby voice state events.");
     }
 
     public void Clear()
@@ -138,6 +139,7 @@ public class LobbySessionManager
 
     private void HandleLobbyUserVoiceChatStateChanged(string userId, bool isActive)
     {
+        Debug.Log($"[LobbyVoice] Lobby user speaking indicator event. userId={userId}, speaking={isActive}, hasNickname={_nicknamesByUserId.ContainsKey(userId)}");
         if (_nicknamesByUserId.TryGetValue(userId, out UI_Nickname nicknameUI) && nicknameUI != null)
             nicknameUI.SetVoiceChatActive(isActive);
     }
