@@ -5,6 +5,9 @@ using UnityEngine.UI;
 
 public class UI_LobbyMenu : UI_Scene
 {
+    private const string MaskedCodeText = "******";
+    private const string HiddenCodeButtonText = "Show Code";
+    private const string VisibleCodeButtonText = "Hide Code";
 
     enum Images
     {
@@ -28,6 +31,8 @@ public class UI_LobbyMenu : UI_Scene
         QuitRoom,
     }
 
+    private bool _isCodeVisible;
+
     public override void Init()
     {
         base.Init();
@@ -39,6 +44,9 @@ public class UI_LobbyMenu : UI_Scene
         GetButton((int)Buttons.ShowCode).gameObject.BindEvent(OnShowCodeButtonClicked);
         GetButton((int)Buttons.InviteRoom).gameObject.BindEvent(OnInviteRoomButtonClicked);
         GetButton((int)Buttons.QuitRoom).gameObject.BindEvent(OnQuitRoomButtonClicked);
+
+        ApplyJoinCodeState();
+        gameObject.SetActive(false);
     }
 
     private void OnDestroy()
@@ -47,17 +55,44 @@ public class UI_LobbyMenu : UI_Scene
 
     private void OnSystemSettingsButtonClicked(PointerEventData eventData)
     {
+        Managers.Chat.EnqueueMessage("System settings UI is not ready yet.", 2.5f);
     }
 
     private void OnShowCodeButtonClicked(PointerEventData eventData)
     {
+        _isCodeVisible = !_isCodeVisible;
+        ApplyJoinCodeState();
     }
 
     private void OnInviteRoomButtonClicked(PointerEventData eventData)
     {
+        if (!Managers.Discord.IsLinked)
+        {
+            Managers.Chat.EnqueueMessage("Connect Discord before inviting a friend.", 2.5f);
+            return;
+        }
+
+        Managers.Discord.RequestFriendInvite(string.Empty);
+        Managers.Chat.EnqueueMessage("Discord friend invite requested.", 2.5f);
     }
 
     private void OnQuitRoomButtonClicked(PointerEventData eventData)
     {
+        Managers.Scene.LoadScene(Define.Scene.Intro);
+    }
+
+    private void ApplyJoinCodeState()
+    {
+        TextMeshProUGUI showCodeText = Get<TextMeshProUGUI>((int)Texts.ShowCode);
+        TextMeshProUGUI codeText = Get<TextMeshProUGUI>((int)Texts.Code);
+
+        string joinCode = Managers.Lobby.CurrentJoinCode;
+        bool canRevealCode = !string.IsNullOrWhiteSpace(joinCode);
+
+        if (showCodeText != null)
+            showCodeText.text = _isCodeVisible && canRevealCode ? VisibleCodeButtonText : HiddenCodeButtonText;
+
+        if (codeText != null)
+            codeText.text = _isCodeVisible && canRevealCode ? joinCode : MaskedCodeText;
     }
 }

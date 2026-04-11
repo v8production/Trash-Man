@@ -21,25 +21,34 @@ public readonly struct DiscordLobbyUser
 
 public class DiscordManager
 {
-    private const string DefaultScopes = "openid sdk.social_layer_presence";
+    private const string DefaultScopes = "openid sdk.social_layer";
     private const string ClientTypeName = "Discord.Sdk.Client, Discord.Sdk";
     private const string AuthArgsTypeName = "Discord.Sdk.AuthorizationArgs, Discord.Sdk";
     private const string AuthTokenTypeName = "Discord.Sdk.AuthorizationTokenType, Discord.Sdk";
 
     private readonly Dictionary<string, DiscordLobbyUser> _members = new();
+    private readonly Dictionary<string, bool> _voiceChatActiveByUserId = new();
     private int _inviteSerial;
 
     private object _client;
     private Type _clientType;
+    private object _activeVoiceCall;
     private Delegate _statusChangedCallback;
+    private Delegate _createOrJoinLobbyCallback;
+    private Delegate _callSpeakingStatusChangedCallback;
+    private Delegate _callVoiceStateChangedCallback;
     private string _pendingCodeVerifier = string.Empty;
+    private string _pendingVoiceLobbySecret = string.Empty;
+    private string _activeVoiceLobbySecret = string.Empty;
     private ulong _applicationId;
+    private ulong _activeVoiceLobbyId;
     private string _scopes = DefaultScopes;
 
     public event Action<DiscordLobbyUser> OnLobbyUserJoined;
     public event Action<string> OnInviteRequested;
     public event Action<string> OnLocalDisplayNameChanged;
     public event Action OnAuthStateChanged;
+    public event Action<string, bool> OnLobbyUserVoiceChatStateChanged;
 
     public bool IsLinked { get; private set; }
     public bool IsConnecting { get; private set; }
@@ -112,7 +121,9 @@ public class DiscordManager
 
     public void Clear()
     {
+        EndActiveLobbyVoice();
         _members.Clear();
+        _voiceChatActiveByUserId.Clear();
         _inviteSerial = 0;
         IsConnecting = false;
         LastAuthError = null;
@@ -134,6 +145,7 @@ public class DiscordManager
 
         DiscordLobbyUser localUser = new(LocalUserId, LocalDisplayName, true);
         _members[LocalUserId] = localUser;
+        _voiceChatActiveByUserId[LocalUserId] = false;
 
         Debug.Log($"Discord link success: username={LocalDisplayName}");
         OnAuthStateChanged?.Invoke();
@@ -163,7 +175,74 @@ public class DiscordManager
 
         DiscordLobbyUser user = new(userId, displayName, isLocalUser);
         _members[userId] = user;
+        if (!_voiceChatActiveByUserId.ContainsKey(userId))
+            _voiceChatActiveByUserId[userId] = false;
         OnLobbyUserJoined?.Invoke(user);
+    }
+
+    public bool IsLobbyUserVoiceChatActive(string userId)
+    {
+        if (string.IsNullOrWhiteSpace(userId))
+            return false;
+
+        return _voiceChatActiveByUserId.TryGetValue(userId, out bool isActive) && isActive;
+    }
+
+    public void SetLobbyUserVoiceChatActive(string userId, bool isActive)
+    {
+        if (string.IsNullOrWhiteSpace(userId))
+            return;
+
+        if (_voiceChatActiveByUserId.TryGetValue(userId, out bool previousState) && previousState == isActive)
+            return;
+
+        _voiceChatActiveByUserId[userId] = isActive;
+        OnLobbyUserVoiceChatStateChanged?.Invoke(userId, isActive);
+    }
+
+    public void EnsureLobbyVoiceConnected(string lobbySecret)
+    {
+        if (string.IsNullOrWhiteSpace(lobbySecret) || !IsLinked)
+            return;
+
+        if (!EnsureClient())
+            return;
+
+        if (_activeVoiceCall != null && string.Equals(_activeVoiceLobbySecret, lobbySecret, StringComparison.Ordinal))
+            return;
+
+        if (_activeVoiceCall != null && !string.Equals(_activeVoiceLobbySecret, lobbySecret, StringComparison.Ordinal))
+            EndActiveLobbyVoice();
+
+        _pendingVoiceLobbySecret = lobbySecret;
+
+        try
+        {
+            _createOrJoinLobbyCallback = CreateMethodCallback(_client, "CreateOrJoinLobby", 2, 1, HandleCreateOrJoinLobbyBridge);
+            InvokeInstance(_client, "CreateOrJoinLobby", lobbySecret, _createOrJoinLobbyCallback);
+        }
+        catch (Exception e)
+        {
+            Debug.LogWarning($"Discord lobby voice connect failed while joining lobby: {e.Message}");
+        }
+    }
+
+    public void EndActiveLobbyVoice()
+    {
+        try
+        {
+            if (_client != null && _activeVoiceLobbyId != 0)
+                InvokeInstance(_client, "EndCall", _activeVoiceLobbyId, null);
+        }
+        catch
+        {
+        }
+
+        _activeVoiceCall = null;
+        _activeVoiceLobbyId = 0;
+        _activeVoiceLobbySecret = string.Empty;
+        _pendingVoiceLobbySecret = string.Empty;
+        ResetAllLobbyVoiceChatStates();
     }
 
     private bool EnsureClient()
@@ -209,6 +288,43 @@ public class DiscordManager
         MethodCallExpression bridgeCall = Expression.Call(Expression.Constant(bridge), typeof(Action<object[]>).GetMethod("Invoke"), packedArgs);
         LambdaExpression lambda = Expression.Lambda(delegateType, bridgeCall, args);
         return lambda.Compile();
+    }
+
+    private static Delegate CreateDelegateCallback(Type delegateType, Action<object[]> bridge)
+    {
+        MethodInfo invokeMethod = delegateType.GetMethod("Invoke", BindingFlags.Public | BindingFlags.Instance);
+        ParameterInfo[] parameters = invokeMethod.GetParameters();
+        ParameterExpression[] args = parameters.Select(p => Expression.Parameter(p.ParameterType, p.Name)).ToArray();
+
+        NewArrayExpression packedArgs = Expression.NewArrayInit(typeof(object), args.Select(p => Expression.Convert(p, typeof(object))));
+        MethodCallExpression bridgeCall = Expression.Call(Expression.Constant(bridge), typeof(Action<object[]>).GetMethod("Invoke"), packedArgs);
+        LambdaExpression lambda = Expression.Lambda(delegateType, bridgeCall, args);
+        return lambda.Compile();
+    }
+
+    private static Delegate CreateMethodCallback(object target, string methodName, int parameterCount, int delegateParameterIndex, Action<object[]> bridge)
+    {
+        if (target == null)
+            throw new InvalidOperationException($"Cannot create callback for {methodName}: target is null.");
+
+        MethodInfo method = target.GetType().GetMethods(BindingFlags.Public | BindingFlags.Instance)
+            .FirstOrDefault(m =>
+            {
+                if (m.Name != methodName)
+                    return false;
+
+                ParameterInfo[] parameters = m.GetParameters();
+                return parameters.Length == parameterCount
+                    && delegateParameterIndex >= 0
+                    && delegateParameterIndex < parameters.Length
+                    && typeof(Delegate).IsAssignableFrom(parameters[delegateParameterIndex].ParameterType);
+            });
+
+        if (method == null)
+            throw new MissingMethodException(target.GetType().FullName, methodName);
+
+        Type delegateType = method.GetParameters()[delegateParameterIndex].ParameterType;
+        return CreateDelegateCallback(delegateType, bridge);
     }
 
     private void HandleAuthorizeResultBridge(object[] args)
@@ -307,6 +423,92 @@ public class DiscordManager
             SetConnectFailed($"Discord disconnected: {error} ({errorDetail})");
     }
 
+    private void HandleCreateOrJoinLobbyBridge(object[] args)
+    {
+        object result = args.Length > 0 ? args[0] : null;
+        ulong lobbyId = args.Length > 1 ? ConvertToUInt64(args[1]) : 0;
+
+        if (!IsSdkResultSuccessful(result) || lobbyId == 0)
+        {
+            Debug.LogWarning($"Discord lobby voice connect failed: {GetSdkResultError(result)}");
+            return;
+        }
+
+        _activeVoiceLobbyId = lobbyId;
+        _activeVoiceLobbySecret = _pendingVoiceLobbySecret;
+        StartOrReuseVoiceCall(lobbyId);
+    }
+
+    private void HandleSpeakingStatusChangedBridge(object[] args)
+    {
+        ulong userId = args.Length > 0 ? ConvertToUInt64(args[0]) : 0;
+        bool isSpeaking = args.Length > 1 && args[1] is bool speaking && speaking;
+
+        if (userId == 0)
+            return;
+
+        SetLobbyUserVoiceChatActive(userId.ToString(), isSpeaking);
+    }
+
+    private void HandleVoiceStateChangedBridge(object[] args)
+    {
+        ulong userId = args.Length > 0 ? ConvertToUInt64(args[0]) : 0;
+        if (userId == 0)
+            return;
+
+        if (!IsLobbyUserVoiceChatActive(userId.ToString()))
+            SetLobbyUserVoiceChatActive(userId.ToString(), false);
+    }
+
+    private void StartOrReuseVoiceCall(ulong lobbyId)
+    {
+        object call = null;
+
+        try
+        {
+            call = InvokeInstance(_client, "StartCall", lobbyId);
+            if (call == null)
+                call = InvokeInstance(_client, "GetCall", lobbyId);
+        }
+        catch (Exception e)
+        {
+            Debug.LogWarning($"Discord voice call start failed: {e.Message}");
+            return;
+        }
+
+        if (call == null)
+        {
+            Debug.LogWarning("Discord voice call start returned null and no existing call was found.");
+            return;
+        }
+
+        _activeVoiceCall = call;
+        RegisterVoiceCallCallbacks(call);
+    }
+
+    private void RegisterVoiceCallCallbacks(object call)
+    {
+        try
+        {
+            _callVoiceStateChangedCallback = CreateMethodCallback(call, "SetOnVoiceStateChangedCallback", 1, 0, HandleVoiceStateChangedBridge);
+            InvokeInstance(call, "SetOnVoiceStateChangedCallback", _callVoiceStateChangedCallback);
+        }
+        catch (Exception e)
+        {
+            Debug.LogWarning($"Discord voice-state callback registration failed: {e.Message}");
+        }
+
+        try
+        {
+            _callSpeakingStatusChangedCallback = CreateMethodCallback(call, "SetSpeakingStatusChangedCallback", 1, 0, HandleSpeakingStatusChangedBridge);
+            InvokeInstance(call, "SetSpeakingStatusChangedCallback", _callSpeakingStatusChangedCallback);
+        }
+        catch (Exception e)
+        {
+            Debug.LogWarning($"Discord speaking callback registration failed: {e.Message}");
+        }
+    }
+
     private void LinkCurrentDiscordUser()
     {
         object user = null;
@@ -400,6 +602,30 @@ public class DiscordManager
         }
 
         return null;
+    }
+
+    private void ResetAllLobbyVoiceChatStates()
+    {
+        string[] userIds = _voiceChatActiveByUserId.Keys.ToArray();
+        for (int i = 0; i < userIds.Length; i++)
+            SetLobbyUserVoiceChatActive(userIds[i], false);
+    }
+
+    private static ulong ConvertToUInt64(object value)
+    {
+        if (value == null)
+            return 0;
+
+        if (value is ulong ulongValue)
+            return ulongValue;
+
+        if (value is long longValue && longValue >= 0)
+            return (ulong)longValue;
+
+        if (value is int intValue && intValue >= 0)
+            return (ulong)intValue;
+
+        return ulong.TryParse(value.ToString(), out ulong parsedValue) ? parsedValue : 0;
     }
 
     private static bool IsSdkResultSuccessful(object result)

@@ -752,6 +752,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: UI_LobbyOption
       objectReference: {fileID: 0}
+    - target: {fileID: 2888682981527306731, guid: 532f291793f3545a4a9fe026f4d501f8, type: 3}
+      propertyPath: m_IsActive
+      value: 0
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -771,7 +775,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 3120830422442529740, guid: 8527939935a1fd340b72588c8a96e5ac, type: 3}
       propertyPath: m_IsActive
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 3129269691619266183, guid: 8527939935a1fd340b72588c8a96e5ac, type: 3}
       propertyPath: m_LocalPosition.x

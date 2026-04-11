@@ -20,10 +20,16 @@ public class LobbySessionManager
 
     public void Init()
     {
+        Managers.Discord.OnLocalDisplayNameChanged -= HandleLocalDisplayNameChanged;
+        Managers.Discord.OnLocalDisplayNameChanged += HandleLocalDisplayNameChanged;
+        Managers.Discord.OnLobbyUserVoiceChatStateChanged -= HandleLobbyUserVoiceChatStateChanged;
+        Managers.Discord.OnLobbyUserVoiceChatStateChanged += HandleLobbyUserVoiceChatStateChanged;
     }
 
     public void Clear()
     {
+        Managers.Discord.OnLocalDisplayNameChanged -= HandleLocalDisplayNameChanged;
+        Managers.Discord.OnLobbyUserVoiceChatStateChanged -= HandleLobbyUserVoiceChatStateChanged;
         _rangersByUserId.Clear();
         _nicknamesByUserId.Clear();
         IsHosting = false;
@@ -120,7 +126,20 @@ public class LobbySessionManager
         }
 
         nicknameUI.SetText(Managers.Discord.LocalDisplayName);
+        nicknameUI.SetVoiceChatActive(Managers.Discord.IsLobbyUserVoiceChatActive(Managers.Discord.LocalUserId));
         _nicknamesByUserId[Managers.Discord.LocalUserId] = nicknameUI;
+    }
+
+    private void HandleLocalDisplayNameChanged(string displayName)
+    {
+        if (_nicknamesByUserId.TryGetValue(Managers.Discord.LocalUserId, out UI_Nickname nicknameUI) && nicknameUI != null)
+            nicknameUI.SetText(displayName);
+    }
+
+    private void HandleLobbyUserVoiceChatStateChanged(string userId, bool isActive)
+    {
+        if (_nicknamesByUserId.TryGetValue(userId, out UI_Nickname nicknameUI) && nicknameUI != null)
+            nicknameUI.SetVoiceChatActive(isActive);
     }
 
     private static string GenerateJoinCode()

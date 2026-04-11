@@ -6,7 +6,7 @@ using UnityEngine.UI;
 public class UI_Intro : UI_Scene
 {
     [Header("Discord Social SDK")]
-    [SerializeField] private string _discordScopes = "openid sdk.social_layer_presence";
+    [SerializeField] private string _discordScopes = "openid sdk.social_layer";
 
     private const string DiscordApplicationIdKey = "DISCORD_APPLICATION_ID";
 
