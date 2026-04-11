@@ -1,13 +1,56 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
+using System.Collections.Generic;
 
 public class LobbyScene : BaseScene
 {
     private const string DiscordApplicationIdKey = "DISCORD_APPLICATION_ID";
     private const string DiscordLobbyVoiceSecretKey = "DISCORD_LOBBY_VOICE_SECRET";
-    private const string DefaultLobbyVoiceSecret = "trash-man-lobby-scene";
 
     private UI_LobbyMenu _lobbyMenu;
+
+    private static readonly Dictionary<string, LobbyUserEntry> s_userEntriesByDiscordUserId = new();
+
+    private sealed class LobbyUserEntry
+    {
+        public RangerController Ranger;
+        public UI_Nickname Nickname;
+    }
+
+    public static void RegisterUserObjects(string userId, RangerController ranger, UI_Nickname nickname)
+    {
+        if (string.IsNullOrWhiteSpace(userId))
+            return;
+
+        if (!s_userEntriesByDiscordUserId.TryGetValue(userId, out LobbyUserEntry entry) || entry == null)
+        {
+            entry = new LobbyUserEntry();
+            s_userEntriesByDiscordUserId[userId] = entry;
+        }
+
+        if (ranger != null)
+            entry.Ranger = ranger;
+
+        if (nickname != null)
+            entry.Nickname = nickname;
+    }
+
+    public static bool TrySetNicknameSpeakerActive(string userId, bool isVoiceChatActive)
+    {
+        if (string.IsNullOrWhiteSpace(userId))
+            return false;
+
+        if (!s_userEntriesByDiscordUserId.TryGetValue(userId, out LobbyUserEntry entry) || entry == null || entry.Nickname == null)
+            return false;
+
+        entry.Nickname.SetActive(isVoiceChatActive);
+        return true;
+    }
+
+    public static void ClearUserObjectRegistry()
+    {
+        s_userEntriesByDiscordUserId.Clear();
+    }
 
     protected override void Init()
     {
@@ -20,6 +63,15 @@ public class LobbyScene : BaseScene
 
         if (Managers.Scene.ConsumeLobbyHostRequest())
             Managers.Lobby.BootstrapLocalHostLobby();
+        else if (Managers.Scene.ConsumeLobbyJoinCodeRequest(out string joinCode))
+        {
+            if (!Managers.Lobby.JoinLobbyByCode(joinCode))
+            {
+                Managers.Chat.EnqueueMessage("Failed to join lobby with that code.", 2.5f);
+                Managers.Scene.LoadScene(Define.Scene.Intro);
+                return;
+            }
+        }
 
         Managers.Discord.OnAuthStateChanged -= HandleDiscordAuthStateChanged;
         Managers.Discord.OnAuthStateChanged += HandleDiscordAuthStateChanged;
@@ -108,8 +160,23 @@ public class LobbyScene : BaseScene
 
     private static string GetLobbyVoiceSecret()
     {
+        string activeVoiceSecret = Managers.Lobby.CurrentVoiceSecret;
+        if (!string.IsNullOrWhiteSpace(activeVoiceSecret))
+            return activeVoiceSecret;
+
         string configuredSecret = Util.GetEnv(DiscordLobbyVoiceSecretKey);
-        return string.IsNullOrWhiteSpace(configuredSecret) ? DefaultLobbyVoiceSecret : configuredSecret.Trim();
+        if (!string.IsNullOrWhiteSpace(configuredSecret))
+            return configuredSecret.Trim();
+
+        string joinCode = Managers.Lobby.CurrentJoinCode;
+        if (!string.IsNullOrWhiteSpace(joinCode))
+            return $"trash-man-lobby-{joinCode.Trim().ToLowerInvariant()}";
+
+        string localUserId = Managers.Discord.LocalUserId;
+        if (!string.IsNullOrWhiteSpace(localUserId))
+            return $"trash-man-lobby-{localUserId.Trim().ToLowerInvariant()}";
+
+        return "trash-man-lobby";
     }
 
     private static void LogLobbyVoice(string message)
@@ -120,6 +187,7 @@ public class LobbyScene : BaseScene
 
     public override void Clear()
     {
+        ClearUserObjectRegistry();
         Managers.Discord.OnAuthStateChanged -= HandleDiscordAuthStateChanged;
         Managers.Discord.EndActiveLobbyVoice();
 

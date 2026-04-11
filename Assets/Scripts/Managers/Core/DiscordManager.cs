@@ -25,9 +25,12 @@ public class DiscordManager
     private const string ClientTypeName = "Discord.Sdk.Client, Discord.Sdk";
     private const string AuthArgsTypeName = "Discord.Sdk.AuthorizationArgs, Discord.Sdk";
     private const string AuthTokenTypeName = "Discord.Sdk.AuthorizationTokenType, Discord.Sdk";
+    private const float SpeakingActiveTimeoutSeconds = 0.9f;
 
     private readonly Dictionary<string, DiscordLobbyUser> _members = new();
     private readonly Dictionary<string, bool> _voiceChatActiveByUserId = new();
+    private readonly Dictionary<string, float> _lastSpeakingSignalTimeByUserId = new();
+    private readonly List<string> _speakingTimeoutBuffer = new();
     private int _inviteSerial;
 
     private object _client;
@@ -46,6 +49,7 @@ public class DiscordManager
 
     public event Action<DiscordLobbyUser> OnLobbyUserJoined;
     public event Action<string> OnInviteRequested;
+    public event Action<string> OnInviteLinkCreated;
     public event Action<string> OnLocalDisplayNameChanged;
     public event Action OnAuthStateChanged;
     public event Action<string, bool> OnLobbyUserVoiceChatStateChanged;
@@ -60,6 +64,33 @@ public class DiscordManager
     {
         LogVoice("Init called. Ensuring Discord client instance.");
         _ = EnsureClient();
+    }
+
+    public void OnUpdate()
+    {
+        if (_lastSpeakingSignalTimeByUserId.Count == 0)
+            return;
+
+        float now = Time.unscaledTime;
+        _speakingTimeoutBuffer.Clear();
+
+        foreach (KeyValuePair<string, float> pair in _lastSpeakingSignalTimeByUserId)
+        {
+            if (now - pair.Value >= SpeakingActiveTimeoutSeconds)
+                _speakingTimeoutBuffer.Add(pair.Key);
+        }
+
+        for (int i = 0; i < _speakingTimeoutBuffer.Count; i++)
+        {
+            string userId = _speakingTimeoutBuffer[i];
+            _lastSpeakingSignalTimeByUserId.Remove(userId);
+
+            if (IsLobbyUserVoiceChatActive(userId))
+            {
+                LogVoice($"Speaking timeout elapsed. userId={userId}, forcing speaking=false");
+                SetLobbyUserVoiceChatActive(userId, false);
+            }
+        }
     }
 
     public void Connect(ulong applicationId, string scopes)
@@ -135,6 +166,8 @@ public class DiscordManager
         EndActiveLobbyVoice();
         _members.Clear();
         _voiceChatActiveByUserId.Clear();
+        _lastSpeakingSignalTimeByUserId.Clear();
+        _speakingTimeoutBuffer.Clear();
         _inviteSerial = 0;
         IsConnecting = false;
         LastAuthError = null;
@@ -176,6 +209,37 @@ public class DiscordManager
         NotifyLobbyUserJoined(generatedUserId, friendDisplayName, false);
     }
 
+    public void RequestLobbyInvite(string joinCode)
+    {
+        string normalizedCode = LobbySessionManager.NormalizeJoinCode(joinCode);
+        if (string.IsNullOrWhiteSpace(normalizedCode))
+        {
+            Debug.LogWarning("[Lobby] Invite skipped: invalid join code.");
+            return;
+        }
+
+        string deepLink = $"trashman://join?code={normalizedCode}";
+        GUIUtility.systemCopyBuffer = deepLink;
+
+        try
+        {
+            if (EnsureClient())
+            {
+                // Best-effort reflection call. Different SDK versions expose invite popups under different names.
+                MethodInfo openInvitePopup = _client.GetType().GetMethod("OpenInvitePopup", BindingFlags.Public | BindingFlags.Instance, null, Type.EmptyTypes, null);
+                openInvitePopup?.Invoke(_client, null);
+            }
+        }
+        catch (Exception e)
+        {
+            Debug.LogWarning($"[Lobby] Discord invite popup open failed: {e.Message}");
+        }
+
+        OnInviteRequested?.Invoke(normalizedCode);
+        OnInviteLinkCreated?.Invoke(deepLink);
+        Debug.Log($"[Lobby] Invite deep-link copied: {deepLink}");
+    }
+
     public void NotifyLobbyUserJoined(string userId, string displayName, bool isLocalUser)
     {
         if (string.IsNullOrWhiteSpace(userId))
@@ -204,11 +268,17 @@ public class DiscordManager
         if (string.IsNullOrWhiteSpace(userId))
             return;
 
+        if (isActive)
+            _lastSpeakingSignalTimeByUserId[userId] = Time.unscaledTime;
+        else
+            _lastSpeakingSignalTimeByUserId.Remove(userId);
+
         if (_voiceChatActiveByUserId.TryGetValue(userId, out bool previousState) && previousState == isActive)
             return;
 
         _voiceChatActiveByUserId[userId] = isActive;
         LogVoice($"Speaking state changed. userId={userId}, speaking={isActive}");
+        Managers.Lobby.SetRangerNicknameVoiceActive(userId, isActive);
         OnLobbyUserVoiceChatStateChanged?.Invoke(userId, isActive);
     }
 
@@ -483,10 +553,15 @@ public class DiscordManager
     private void HandleSpeakingStatusChangedBridge(object[] args)
     {
         ulong userId = args.Length > 0 ? ConvertToUInt64(args[0]) : 0;
-        bool isSpeaking = args.Length > 1 && args[1] is bool speaking && speaking;
+        object speakingPayload = args.Length > 1 ? args[1] : null;
+        bool isPayloadParsed = TryConvertToBool(speakingPayload, out bool parsedSpeaking);
+        bool isSpeaking = isPayloadParsed && parsedSpeaking;
 
         if (userId == 0)
             return;
+
+        if (speakingPayload != null && !isPayloadParsed)
+            LogVoice($"Speaking callback payload type unsupported. type={speakingPayload.GetType().Name}, value={speakingPayload}");
 
         LogVoice($"Speaking callback received. userId={userId}, speaking={isSpeaking}");
         SetLobbyUserVoiceChatActive(userId.ToString(), isSpeaking);
@@ -723,6 +798,87 @@ public class DiscordManager
     private static string SummarizeSecret(string secret)
     {
         return string.IsNullOrWhiteSpace(secret) ? "empty" : $"len={secret.Length}";
+    }
+
+    private static bool TryConvertToBool(object value, out bool result)
+    {
+        if (value is null)
+        {
+            result = false;
+            return true;
+        }
+
+        if (value is bool boolValue)
+        {
+            result = boolValue;
+            return true;
+        }
+
+        if (value is byte byteValue)
+        {
+            result = byteValue != 0;
+            return true;
+        }
+
+        if (value is sbyte sbyteValue)
+        {
+            result = sbyteValue != 0;
+            return true;
+        }
+
+        if (value is short shortValue)
+        {
+            result = shortValue != 0;
+            return true;
+        }
+
+        if (value is ushort ushortValue)
+        {
+            result = ushortValue != 0;
+            return true;
+        }
+
+        if (value is int intValue)
+        {
+            result = intValue != 0;
+            return true;
+        }
+
+        if (value is uint uintValue)
+        {
+            result = uintValue != 0;
+            return true;
+        }
+
+        if (value is long longValue)
+        {
+            result = longValue != 0;
+            return true;
+        }
+
+        if (value is ulong ulongValue)
+        {
+            result = ulongValue != 0;
+            return true;
+        }
+
+        if (value is string stringValue)
+        {
+            if (bool.TryParse(stringValue, out bool parsedBool))
+            {
+                result = parsedBool;
+                return true;
+            }
+
+            if (long.TryParse(stringValue, out long parsedLong))
+            {
+                result = parsedLong != 0;
+                return true;
+            }
+        }
+
+        result = false;
+        return false;
     }
 
     private void SetConnectFailed(string message)

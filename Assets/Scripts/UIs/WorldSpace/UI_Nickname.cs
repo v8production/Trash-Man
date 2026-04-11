@@ -55,7 +55,7 @@ public class UI_Nickname : UI_Base
             _textComponent.text = _text;
         }
 
-        ApplyVoiceChatState();
+        ApplySpeakerState();
         UpdateNicknameWidth();
         UpdateSpeakerPosition();
     }
@@ -96,6 +96,8 @@ public class UI_Nickname : UI_Base
             _textComponent.text = _text;
             UpdateSpeakerPosition();
         }
+
+        ApplySpeakerState();
     }
 
     public void SetText(string text)
@@ -109,11 +111,15 @@ public class UI_Nickname : UI_Base
         }
     }
 
+    public void SetActive(bool isVoiceChatActive)
+    {
+        _isVoiceChatActive = isVoiceChatActive;
+        UpdateSpeakerPosition();
+    }
+
     public void SetVoiceChatActive(bool isActive)
     {
-        _isVoiceChatActive = isActive;
-        ApplyVoiceChatState();
-        UpdateSpeakerPosition();
+        SetActive(isActive);
     }
 
     public void SetAnchorTarget(Transform anchorTarget)
@@ -124,7 +130,7 @@ public class UI_Nickname : UI_Base
     public void Hide() => gameObject.SetActive(false);
     public void Show() => gameObject.SetActive(true);
 
-    private void ApplyVoiceChatState()
+    private void ApplySpeakerState()
     {
         if (_speakerImage == null)
             return;
@@ -167,13 +173,13 @@ public class UI_Nickname : UI_Base
         if (target == null)
             return Vector3.zero;
 
+        CharacterController characterController = target.GetComponent<CharacterController>();
+        if (characterController != null)
+            return characterController.center + Vector3.up * characterController.height;
+
         Collider collider = target.GetComponent<Collider>();
         if (collider != null)
             return collider.bounds.center + Vector3.up * collider.bounds.extents.y;
-
-        Collider colliderInChildren = target.GetComponentInChildren<Collider>();
-        if (colliderInChildren != null)
-            return colliderInChildren.bounds.center + Vector3.up * colliderInChildren.bounds.extents.y;
 
         Renderer renderer = target.GetComponentInChildren<Renderer>();
         if (renderer != null)

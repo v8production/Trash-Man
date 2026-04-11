@@ -53,6 +53,11 @@ public class UI_LobbyMenu : UI_Scene
     {
     }
 
+    private void OnEnable()
+    {
+        ApplyJoinCodeState();
+    }
+
     private void OnSystemSettingsButtonClicked(PointerEventData eventData)
     {
         Managers.Chat.EnqueueMessage("System settings UI is not ready yet.", 2.5f);
@@ -72,12 +77,20 @@ public class UI_LobbyMenu : UI_Scene
             return;
         }
 
-        Managers.Discord.RequestFriendInvite(string.Empty);
-        Managers.Chat.EnqueueMessage("Discord friend invite requested.", 2.5f);
+        string joinCode = Managers.Lobby.CurrentJoinCode;
+        if (string.IsNullOrWhiteSpace(joinCode))
+        {
+            Managers.Chat.EnqueueMessage("Lobby code is not ready yet.", 2.5f);
+            return;
+        }
+
+        Managers.Discord.RequestLobbyInvite(joinCode);
+        Managers.Chat.EnqueueMessage($"Invite sent. Code: {joinCode}", 2.5f);
     }
 
     private void OnQuitRoomButtonClicked(PointerEventData eventData)
     {
+        Managers.Lobby.QuitCurrentRoom();
         Managers.Scene.LoadScene(Define.Scene.Intro);
     }
 

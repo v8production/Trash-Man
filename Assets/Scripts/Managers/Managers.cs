@@ -43,6 +43,8 @@ public class Managers : MonoBehaviour
     void Update()
     {
         _chatMessageManager.OnUpdate();
+        _lobbySessionManager.OnUpdate();
+        _discordManager.OnUpdate();
     }
 
     static void Init()
@@ -60,6 +62,7 @@ public class Managers : MonoBehaviour
 
             _instance._inputManager.Init();
             _instance._dataManager.Init();
+            _instance._sceneManager.Init();
             _instance._gameStateManager.Init();
             _instance._chatMessageManager.Init();
             _instance._lobbySessionManager.Init();

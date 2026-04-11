@@ -78,7 +78,12 @@ public class UI_Intro : UI_Scene
 
     private void OnJoinButtonClicked(PointerEventData eventData)
     {
-        Managers.Scene.LoadScene(Define.Scene.Lobby);
+        UI_EnterCode.Show(HandleJoinCodeSubmitted);
+    }
+
+    private void HandleJoinCodeSubmitted(string joinCode)
+    {
+        Managers.Scene.LoadLobbyByCode(joinCode);
     }
 
     private void OnQuitButtonClicked(PointerEventData eventData)
