@@ -38,14 +38,24 @@ public class DiscordManager
     private object _activeVoiceCall;
     private Delegate _statusChangedCallback;
     private Delegate _createOrJoinLobbyCallback;
+    private Delegate _sessionCreateOrJoinLobbyCallback;
+    private Delegate _leaveLobbyCallback;
+    private Delegate _lobbyUpdatedCallback;
+    private Delegate _lobbyMemberAddedCallback;
+    private Delegate _lobbyMemberRemovedCallback;
     private Delegate _callSpeakingStatusChangedCallback;
     private Delegate _callVoiceStateChangedCallback;
     private string _pendingCodeVerifier = string.Empty;
     private string _pendingVoiceLobbySecret = string.Empty;
+    private string _pendingSessionLobbySecret = string.Empty;
     private string _activeVoiceLobbySecret = string.Empty;
     private ulong _applicationId;
     private ulong _activeVoiceLobbyId;
+    private ulong _pendingLeaveLobbyId;
     private string _scopes = DefaultScopes;
+
+    private readonly Dictionary<string, ulong> _sessionLobbyIdBySecret = new();
+    private Action<bool, ulong, string> _sessionLobbyJoinCompletion;
 
     public event Action<DiscordLobbyUser> OnLobbyUserJoined;
     public event Action<string> OnInviteRequested;
@@ -53,6 +63,9 @@ public class DiscordManager
     public event Action<string> OnLocalDisplayNameChanged;
     public event Action OnAuthStateChanged;
     public event Action<string, bool> OnLobbyUserVoiceChatStateChanged;
+    public event Action<ulong> OnSessionLobbyUpdated;
+    public event Action<ulong, ulong> OnSessionLobbyMemberAdded;
+    public event Action<ulong, ulong> OnSessionLobbyMemberRemoved;
 
     public bool IsLinked { get; private set; }
     public bool IsConnecting { get; private set; }
@@ -168,6 +181,10 @@ public class DiscordManager
         _voiceChatActiveByUserId.Clear();
         _lastSpeakingSignalTimeByUserId.Clear();
         _speakingTimeoutBuffer.Clear();
+        _sessionLobbyIdBySecret.Clear();
+        _pendingSessionLobbySecret = string.Empty;
+        _sessionLobbyJoinCompletion = null;
+        _pendingLeaveLobbyId = 0;
         _inviteSerial = 0;
         IsConnecting = false;
         LastAuthError = null;
@@ -238,6 +255,139 @@ public class DiscordManager
         OnInviteRequested?.Invoke(normalizedCode);
         OnInviteLinkCreated?.Invoke(deepLink);
         Debug.Log($"[Lobby] Invite deep-link copied: {deepLink}");
+    }
+
+    public bool CreateOrJoinSessionLobby(string lobbySecret, Dictionary<string, string> lobbyMetadata, Dictionary<string, string> memberMetadata, bool writeMetadata, Action<bool, ulong, string> onCompleted)
+    {
+        if (string.IsNullOrWhiteSpace(lobbySecret))
+            return false;
+
+        if (!EnsureClient())
+            return false;
+
+        _pendingSessionLobbySecret = lobbySecret;
+        _sessionLobbyJoinCompletion = onCompleted;
+
+        try
+        {
+            if (writeMetadata)
+            {
+                _sessionCreateOrJoinLobbyCallback = CreateMethodCallback(_client, "CreateOrJoinLobbyWithMetadata", 4, 3, HandleSessionCreateOrJoinLobbyBridge);
+                InvokeInstance(_client,
+                    "CreateOrJoinLobbyWithMetadata",
+                    lobbySecret,
+                    lobbyMetadata ?? new Dictionary<string, string>(),
+                    memberMetadata ?? new Dictionary<string, string>(),
+                    _sessionCreateOrJoinLobbyCallback);
+                LogVoice($"Session lobby CreateOrJoinLobbyWithMetadata requested. secret({SummarizeSecret(lobbySecret)})");
+            }
+            else
+            {
+                _sessionCreateOrJoinLobbyCallback = CreateMethodCallback(_client, "CreateOrJoinLobby", 2, 1, HandleSessionCreateOrJoinLobbyBridge);
+                InvokeInstance(_client, "CreateOrJoinLobby", lobbySecret, _sessionCreateOrJoinLobbyCallback);
+                LogVoice($"Session lobby CreateOrJoinLobby requested. secret({SummarizeSecret(lobbySecret)})");
+            }
+
+            return true;
+        }
+        catch (Exception e)
+        {
+            Debug.LogWarning($"[Lobby] Session lobby join request failed: {e.Message}");
+            _sessionLobbyJoinCompletion?.Invoke(false, 0, e.Message);
+            _sessionLobbyJoinCompletion = null;
+            return false;
+        }
+    }
+
+    public bool TryGetSessionLobbyMetadata(ulong lobbyId, out Dictionary<string, string> metadata)
+    {
+        metadata = null;
+        if (lobbyId == 0 || !EnsureClient())
+            return false;
+
+        object lobbyHandle = null;
+        object metadataObject = null;
+
+        try
+        {
+            lobbyHandle = InvokeInstance(_client, "GetLobbyHandle", lobbyId);
+            if (lobbyHandle == null)
+                return false;
+
+            metadataObject = InvokeInstance(lobbyHandle, "Metadata");
+            return TryConvertMetadataObject(metadataObject, out metadata);
+        }
+        catch
+        {
+            return false;
+        }
+        finally
+        {
+            DisposeIfNeeded(metadataObject);
+            DisposeIfNeeded(lobbyHandle);
+        }
+    }
+
+    public bool TryGetSessionLobbyMemberIds(ulong lobbyId, out ulong[] memberIds)
+    {
+        memberIds = Array.Empty<ulong>();
+        if (lobbyId == 0 || !EnsureClient())
+            return false;
+
+        object lobbyHandle = null;
+
+        try
+        {
+            lobbyHandle = InvokeInstance(_client, "GetLobbyHandle", lobbyId);
+            if (lobbyHandle == null)
+                return false;
+
+            object ids = InvokeInstance(lobbyHandle, "LobbyMemberIds");
+            if (ids is ulong[] typed)
+            {
+                memberIds = typed;
+                return true;
+            }
+
+            return false;
+        }
+        catch
+        {
+            return false;
+        }
+        finally
+        {
+            DisposeIfNeeded(lobbyHandle);
+        }
+    }
+
+    public bool TryGetSessionLobbyIdBySecret(string lobbySecret, out ulong lobbyId)
+    {
+        if (string.IsNullOrWhiteSpace(lobbySecret))
+        {
+            lobbyId = 0;
+            return false;
+        }
+
+        return _sessionLobbyIdBySecret.TryGetValue(lobbySecret, out lobbyId);
+    }
+
+    public void LeaveSessionLobby(ulong lobbyId)
+    {
+        if (lobbyId == 0 || !EnsureClient())
+            return;
+
+        _pendingLeaveLobbyId = lobbyId;
+
+        try
+        {
+            _leaveLobbyCallback = CreateMethodCallback(_client, "LeaveLobby", 2, 1, HandleLeaveSessionLobbyBridge);
+            InvokeInstance(_client, "LeaveLobby", lobbyId, _leaveLobbyCallback);
+        }
+        catch (Exception e)
+        {
+            Debug.LogWarning($"[Lobby] LeaveSessionLobby invoke failed: {e.Message}");
+        }
     }
 
     public void NotifyLobbyUserJoined(string userId, string displayName, bool isLocalUser)
@@ -361,6 +511,16 @@ public class DiscordManager
             _client = Activator.CreateInstance(_clientType);
             _statusChangedCallback = CreateClientCallback("OnStatusChanged", HandleClientStatusChangedBridge);
             InvokeInstance(_client, "SetStatusChangedCallback", _statusChangedCallback);
+
+            _lobbyUpdatedCallback = CreateClientCallback("LobbyUpdatedCallback", HandleLobbyUpdatedBridge);
+            InvokeInstance(_client, "SetLobbyUpdatedCallback", _lobbyUpdatedCallback);
+
+            _lobbyMemberAddedCallback = CreateClientCallback("LobbyMemberAddedCallback", HandleLobbyMemberAddedBridge);
+            InvokeInstance(_client, "SetLobbyMemberAddedCallback", _lobbyMemberAddedCallback);
+
+            _lobbyMemberRemovedCallback = CreateClientCallback("LobbyMemberRemovedCallback", HandleLobbyMemberRemovedBridge);
+            InvokeInstance(_client, "SetLobbyMemberRemovedCallback", _lobbyMemberRemovedCallback);
+
             LogVoice("Discord client created and status callback registered.");
             return true;
         }
@@ -548,6 +708,72 @@ public class DiscordManager
         _activeVoiceLobbySecret = _pendingVoiceLobbySecret;
         LogVoice($"Lobby voice join success. lobbyId={lobbyId}, secret({SummarizeSecret(_activeVoiceLobbySecret)})");
         StartOrReuseVoiceCall(lobbyId);
+    }
+
+    private void HandleSessionCreateOrJoinLobbyBridge(object[] args)
+    {
+        object result = args.Length > 0 ? args[0] : null;
+        ulong lobbyId = args.Length > 1 ? ConvertToUInt64(args[1]) : 0;
+
+        if (!IsSdkResultSuccessful(result) || lobbyId == 0)
+        {
+            string error = GetSdkResultError(result);
+            Debug.LogWarning($"[Lobby] Session lobby join failed: {error}");
+            _sessionLobbyJoinCompletion?.Invoke(false, 0, error);
+            _sessionLobbyJoinCompletion = null;
+            return;
+        }
+
+        _sessionLobbyIdBySecret[_pendingSessionLobbySecret] = lobbyId;
+        _sessionLobbyJoinCompletion?.Invoke(true, lobbyId, string.Empty);
+        _sessionLobbyJoinCompletion = null;
+    }
+
+    private void HandleLeaveSessionLobbyBridge(object[] args)
+    {
+        object result = args.Length > 0 ? args[0] : null;
+        if (!IsSdkResultSuccessful(result))
+        {
+            Debug.LogWarning($"[Lobby] LeaveSessionLobby failed: {GetSdkResultError(result)}");
+            return;
+        }
+
+        string[] secrets = _sessionLobbyIdBySecret
+            .Where(pair => pair.Value == _pendingLeaveLobbyId)
+            .Select(pair => pair.Key)
+            .ToArray();
+
+        for (int i = 0; i < secrets.Length; i++)
+            _sessionLobbyIdBySecret.Remove(secrets[i]);
+    }
+
+    private void HandleLobbyUpdatedBridge(object[] args)
+    {
+        ulong lobbyId = args.Length > 0 ? ConvertToUInt64(args[0]) : 0;
+        if (lobbyId == 0)
+            return;
+
+        OnSessionLobbyUpdated?.Invoke(lobbyId);
+    }
+
+    private void HandleLobbyMemberAddedBridge(object[] args)
+    {
+        ulong lobbyId = args.Length > 0 ? ConvertToUInt64(args[0]) : 0;
+        ulong memberId = args.Length > 1 ? ConvertToUInt64(args[1]) : 0;
+        if (lobbyId == 0 || memberId == 0)
+            return;
+
+        OnSessionLobbyMemberAdded?.Invoke(lobbyId, memberId);
+    }
+
+    private void HandleLobbyMemberRemovedBridge(object[] args)
+    {
+        ulong lobbyId = args.Length > 0 ? ConvertToUInt64(args[0]) : 0;
+        ulong memberId = args.Length > 1 ? ConvertToUInt64(args[1]) : 0;
+        if (lobbyId == 0 || memberId == 0)
+            return;
+
+        OnSessionLobbyMemberRemoved?.Invoke(lobbyId, memberId);
     }
 
     private void HandleSpeakingStatusChangedBridge(object[] args)
@@ -798,6 +1024,25 @@ public class DiscordManager
     private static string SummarizeSecret(string secret)
     {
         return string.IsNullOrWhiteSpace(secret) ? "empty" : $"len={secret.Length}";
+    }
+
+    private static bool TryConvertMetadataObject(object metadataObject, out Dictionary<string, string> metadata)
+    {
+        metadata = null;
+
+        if (metadataObject is Dictionary<string, string> typed)
+        {
+            metadata = new Dictionary<string, string>(typed);
+            return true;
+        }
+
+        if (metadataObject is IDictionary<string, string> mapped)
+        {
+            metadata = mapped.ToDictionary(pair => pair.Key, pair => pair.Value);
+            return true;
+        }
+
+        return false;
     }
 
     private static bool TryConvertToBool(object value, out bool result)

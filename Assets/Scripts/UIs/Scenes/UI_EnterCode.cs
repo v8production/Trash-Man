@@ -56,12 +56,6 @@ public class UI_EnterCode : UI_Scene
             return;
         }
 
-        if (!Managers.LobbySession.HasJoinCode(normalizedCode))
-        {
-            Managers.Toast.EnqueueMessage("No lobby is mapped to that code.", 2.5f);
-            return;
-        }
-
         Close();
         Managers.Scene.LoadLobbyByCode(normalizedCode);
     }

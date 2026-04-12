@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
+using System.Net.Sockets;
 using System.Reflection;
 using UnityEngine;
 
@@ -14,32 +16,28 @@ public class LobbySessionManager
     private const string DefaultHostAddress = "127.0.0.1";
     private const string LobbyHostAddressKey = "LOBBY_HOST_ADDRESS";
     private const string VoiceSecretPrefix = "trash-man-lobby";
+    private const string LobbyMetadataJoinCode = "join_code";
+    private const string LobbyMetadataHostUserId = "host_user_id";
+    private const string LobbyMetadataHostAddress = "host_address";
+    private const string LobbyMetadataUtpPort = "utp_port";
+    private const string LobbyMetadataVoiceSecret = "voice_secret";
+    private const float LobbyStateSyncIntervalSeconds = 1f;
 
     private static readonly char[] JoinCodeAlphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ0123456789".ToCharArray();
 
     private readonly Dictionary<string, RangerController> _rangersByUserId = new();
     private readonly Dictionary<string, UI_Nickname> _nicknamesByUserId = new();
-    private static readonly Dictionary<string, LobbyRoomData> s_roomByJoinCode = new();
 
     private string _currentVoiceSecret = string.Empty;
     private ushort _currentPort;
     private string _currentHostAddress = DefaultHostAddress;
-    private string _lastHostPromotionAttemptCode = string.Empty;
-    private bool _hostPromotionAttemptedForCurrentCode;
+    private ulong _currentDiscordLobbyId;
+    private float _nextLobbyStateSyncTime;
+    private bool _isUpdatingHostMetadata;
 
     private static bool s_loggedNetcodeMissing;
     private static bool s_loggedNetworkManagerMissing;
     private static bool s_loggedTransportMissing;
-
-    private sealed class LobbyRoomData
-    {
-        public string JoinCode;
-        public string HostUserId;
-        public string VoiceSecret;
-        public string HostAddress;
-        public ushort Port;
-        public readonly List<string> JoinOrder = new();
-    }
 
     public bool IsHosting { get; private set; }
     public string HostUserId { get; private set; } = string.Empty;
@@ -52,47 +50,34 @@ public class LobbySessionManager
         Managers.Discord.OnLocalDisplayNameChanged += HandleLocalDisplayNameChanged;
         Managers.Discord.OnLobbyUserVoiceChatStateChanged -= HandleLobbyUserVoiceChatStateChanged;
         Managers.Discord.OnLobbyUserVoiceChatStateChanged += HandleLobbyUserVoiceChatStateChanged;
+        Managers.Discord.OnSessionLobbyUpdated -= HandleSessionLobbyUpdated;
+        Managers.Discord.OnSessionLobbyUpdated += HandleSessionLobbyUpdated;
+        Managers.Discord.OnSessionLobbyMemberAdded -= HandleSessionLobbyMemberAdded;
+        Managers.Discord.OnSessionLobbyMemberAdded += HandleSessionLobbyMemberAdded;
+        Managers.Discord.OnSessionLobbyMemberRemoved -= HandleSessionLobbyMemberRemoved;
+        Managers.Discord.OnSessionLobbyMemberRemoved += HandleSessionLobbyMemberRemoved;
         Debug.Log("[LobbyVoice] LobbySessionManager subscribed to lobby voice state events.");
     }
 
     public void OnUpdate()
     {
-        if (string.IsNullOrWhiteSpace(CurrentJoinCode))
+        if (_currentDiscordLobbyId == 0)
             return;
 
-        if (!string.Equals(_lastHostPromotionAttemptCode, CurrentJoinCode, StringComparison.Ordinal))
-        {
-            _lastHostPromotionAttemptCode = CurrentJoinCode;
-            _hostPromotionAttemptedForCurrentCode = false;
-        }
-
-        if (!s_roomByJoinCode.TryGetValue(CurrentJoinCode, out LobbyRoomData room) || room == null)
+        if (Time.unscaledTime < _nextLobbyStateSyncTime)
             return;
 
-        if (string.Equals(room.HostUserId, Managers.Discord.LocalUserId, StringComparison.Ordinal) && !IsHosting)
-        {
-            if (_hostPromotionAttemptedForCurrentCode)
-                return;
-
-            _hostPromotionAttemptedForCurrentCode = true;
-            bool startedHost = TryStartUtpHost(room.Port, out _);
-            if (startedHost)
-            {
-                IsHosting = true;
-                HostUserId = room.HostUserId;
-                Debug.Log($"[Lobby] Host promoted to local user. joinCode={CurrentJoinCode}, port={room.Port}");
-            }
-            else
-            {
-                Debug.LogWarning($"[Lobby] Host promotion deferred. joinCode={CurrentJoinCode}");
-            }
-        }
+        _nextLobbyStateSyncTime = Time.unscaledTime + LobbyStateSyncIntervalSeconds;
+        RefreshHostStateFromDiscordMetadata();
     }
 
     public void Clear()
     {
         Managers.Discord.OnLocalDisplayNameChanged -= HandleLocalDisplayNameChanged;
         Managers.Discord.OnLobbyUserVoiceChatStateChanged -= HandleLobbyUserVoiceChatStateChanged;
+        Managers.Discord.OnSessionLobbyUpdated -= HandleSessionLobbyUpdated;
+        Managers.Discord.OnSessionLobbyMemberAdded -= HandleSessionLobbyMemberAdded;
+        Managers.Discord.OnSessionLobbyMemberRemoved -= HandleSessionLobbyMemberRemoved;
         _rangersByUserId.Clear();
         _nicknamesByUserId.Clear();
         IsHosting = false;
@@ -101,8 +86,9 @@ public class LobbySessionManager
         _currentVoiceSecret = string.Empty;
         _currentPort = 0;
         _currentHostAddress = DefaultHostAddress;
-        _lastHostPromotionAttemptCode = string.Empty;
-        _hostPromotionAttemptedForCurrentCode = false;
+        _currentDiscordLobbyId = 0;
+        _nextLobbyStateSyncTime = 0f;
+        _isUpdatingHostMetadata = false;
     }
 
     public static string NormalizeJoinCode(string value)
@@ -117,10 +103,7 @@ public class LobbySessionManager
     public bool HasJoinCode(string rawJoinCode)
     {
         string joinCode = NormalizeJoinCode(rawJoinCode);
-        if (string.IsNullOrWhiteSpace(joinCode))
-            return false;
-
-        return s_roomByJoinCode.ContainsKey(joinCode);
+        return !string.IsNullOrWhiteSpace(joinCode);
     }
 
     public bool JoinLobbyByCode(string rawJoinCode)
@@ -132,66 +115,33 @@ public class LobbySessionManager
             return false;
         }
 
-        if (!s_roomByJoinCode.TryGetValue(joinCode, out LobbyRoomData room) || room == null)
-        {
-            room = new LobbyRoomData
-            {
-                JoinCode = joinCode,
-                HostUserId = string.Empty,
-                VoiceSecret = BuildVoiceSecret(joinCode),
-                HostAddress = ResolveConfiguredHostAddress(),
-                Port = CalculatePort(joinCode),
-            };
-
-            s_roomByJoinCode[joinCode] = room;
-            Debug.Log($"[Lobby] Join fallback room created for code={joinCode}, host={room.HostAddress}, port={room.Port}");
-        }
-
         CleanupExistingLobbyObjects();
 
         CurrentJoinCode = joinCode;
-        HostUserId = room.HostUserId;
-        IsHosting = string.Equals(HostUserId, Managers.Discord.LocalUserId, StringComparison.Ordinal);
-        _currentVoiceSecret = room.VoiceSecret;
-        _currentHostAddress = room.HostAddress;
-        _currentPort = room.Port;
+        string lobbySecret = BuildVoiceSecret(joinCode);
+        _currentVoiceSecret = lobbySecret;
+        _nextLobbyStateSyncTime = 0f;
 
-        if (!room.JoinOrder.Contains(Managers.Discord.LocalUserId))
-            room.JoinOrder.Add(Managers.Discord.LocalUserId);
+        bool requested = Managers.Discord.CreateOrJoinSessionLobby(
+            lobbySecret,
+            null,
+            BuildLocalMemberMetadata(),
+            false,
+            (success, lobbyId, error) => HandleDiscordLobbyJoined(success, lobbyId, lobbySecret, false, error));
 
-        if (!IsHosting)
-            TryStartUtpClient(room.HostAddress, room.Port);
+        if (!requested)
+        {
+            Debug.LogWarning($"[Lobby] Join failed: Discord session request not issued for code={joinCode}");
+            return false;
+        }
 
-        RangerController ranger = SpawnRangerForLocalUser();
-        SetupLobbyCamera(ranger);
-        SetupNicknameForLocalUser(ranger);
-
-        Managers.Discord.NotifyLobbyUserJoined(Managers.Discord.LocalUserId, Managers.Discord.LocalDisplayName, true);
-        Managers.Discord.EnsureLobbyVoiceConnected(room.VoiceSecret);
         return true;
     }
 
     public void QuitCurrentRoom()
     {
-        string localUserId = Managers.Discord.LocalUserId;
-        if (!string.IsNullOrWhiteSpace(CurrentJoinCode) && s_roomByJoinCode.TryGetValue(CurrentJoinCode, out LobbyRoomData room) && room != null)
-        {
-            room.JoinOrder.Remove(localUserId);
-
-            if (string.Equals(room.HostUserId, localUserId, StringComparison.Ordinal))
-            {
-                if (room.JoinOrder.Count > 0)
-                {
-                    room.HostUserId = room.JoinOrder[0];
-                    Debug.Log($"[Lobby] Host migrated to {room.HostUserId} for joinCode={room.JoinCode}");
-                }
-                else
-                {
-                    s_roomByJoinCode.Remove(room.JoinCode);
-                    Debug.Log($"[Lobby] Room closed. joinCode={room.JoinCode}");
-                }
-            }
-        }
+        if (_currentDiscordLobbyId != 0)
+            Managers.Discord.LeaveSessionLobby(_currentDiscordLobbyId);
 
         TryStopUtp();
         Managers.Discord.EndActiveLobbyVoice();
@@ -203,8 +153,9 @@ public class LobbySessionManager
         _currentVoiceSecret = string.Empty;
         _currentPort = 0;
         _currentHostAddress = DefaultHostAddress;
-        _lastHostPromotionAttemptCode = string.Empty;
-        _hostPromotionAttemptedForCurrentCode = false;
+        _currentDiscordLobbyId = 0;
+        _nextLobbyStateSyncTime = 0f;
+        _isUpdatingHostMetadata = false;
     }
 
     public void SetRangerNicknameVoiceActive(string userId, bool isVoiceChatActive)
@@ -254,27 +205,90 @@ public class LobbySessionManager
         _currentPort = roomPort;
         _currentHostAddress = string.IsNullOrWhiteSpace(hostAddress) ? ResolveConfiguredHostAddress() : hostAddress;
         _currentVoiceSecret = voiceSecret;
+        _nextLobbyStateSyncTime = 0f;
         GUIUtility.systemCopyBuffer = CurrentJoinCode;
         Managers.Toast.EnqueueMessage("Enter code is copied on clipboard.", 2.5f);
 
-        LobbyRoomData room = new()
+        Dictionary<string, string> lobbyMetadata = BuildHostLobbyMetadata(CurrentJoinCode, _currentHostAddress, _currentPort, _currentVoiceSecret, HostUserId);
+        bool requested = Managers.Discord.CreateOrJoinSessionLobby(
+            _currentVoiceSecret,
+            lobbyMetadata,
+            BuildLocalMemberMetadata(),
+            true,
+            (success, lobbyId, error) => HandleDiscordLobbyJoined(success, lobbyId, _currentVoiceSecret, true, error));
+
+        if (!requested)
+            Debug.LogWarning("[Lobby] Host bootstrap failed: Discord session request not issued.");
+    }
+
+    private void HandleDiscordLobbyJoined(bool success, ulong lobbyId, string lobbySecret, bool requestedAsHost, string error)
+    {
+        if (!success || lobbyId == 0)
         {
-            JoinCode = CurrentJoinCode,
-            HostUserId = HostUserId,
-            VoiceSecret = _currentVoiceSecret,
-            HostAddress = _currentHostAddress,
-            Port = _currentPort,
-        };
-        room.JoinOrder.Add(HostUserId);
-        s_roomByJoinCode[CurrentJoinCode] = room;
+            Debug.LogWarning($"[Lobby] Discord lobby join failed. requestedAsHost={requestedAsHost}, error={error}");
+            Managers.Toast.EnqueueMessage("Lobby join failed. Please try again.", 2.5f);
+            Managers.Scene.LoadScene(Define.Scene.Intro);
+            return;
+        }
+
+        _currentDiscordLobbyId = lobbyId;
+
+        if (Managers.Discord.TryGetSessionLobbyMetadata(lobbyId, out Dictionary<string, string> metadata) && metadata != null)
+        {
+            if (metadata.TryGetValue(LobbyMetadataJoinCode, out string metadataJoinCode) && !string.IsNullOrWhiteSpace(metadataJoinCode))
+                CurrentJoinCode = NormalizeJoinCode(metadataJoinCode);
+
+            if (metadata.TryGetValue(LobbyMetadataHostUserId, out string metadataHostUserId) && !string.IsNullOrWhiteSpace(metadataHostUserId))
+                HostUserId = metadataHostUserId;
+
+            if (metadata.TryGetValue(LobbyMetadataHostAddress, out string metadataHostAddress) && !string.IsNullOrWhiteSpace(metadataHostAddress))
+                _currentHostAddress = metadataHostAddress;
+
+            if (metadata.TryGetValue(LobbyMetadataUtpPort, out string metadataPort) && ushort.TryParse(metadataPort, out ushort parsedPort))
+                _currentPort = parsedPort;
+
+            if (metadata.TryGetValue(LobbyMetadataVoiceSecret, out string metadataVoiceSecret) && !string.IsNullOrWhiteSpace(metadataVoiceSecret))
+                _currentVoiceSecret = metadataVoiceSecret;
+        }
+
+        if (string.IsNullOrWhiteSpace(HostUserId))
+            HostUserId = requestedAsHost ? Managers.Discord.LocalUserId : string.Empty;
+
+        IsHosting = requestedAsHost || string.Equals(HostUserId, Managers.Discord.LocalUserId, StringComparison.Ordinal);
+
+        if (!IsHosting)
+            TryStartUtpClient(_currentHostAddress, _currentPort);
 
         RangerController ranger = SpawnRangerForLocalUser();
         SetupLobbyCamera(ranger);
         SetupNicknameForLocalUser(ranger);
 
         Managers.Discord.NotifyLobbyUserJoined(Managers.Discord.LocalUserId, Managers.Discord.LocalDisplayName, true);
+        Managers.Discord.EnsureLobbyVoiceConnected(_currentVoiceSecret);
+        _nextLobbyStateSyncTime = 0f;
 
-        Debug.Log($"Lobby host ready: user={Managers.Discord.LocalDisplayName}, joinCode={CurrentJoinCode}, port={_currentPort}, utpHostStarted={IsHosting}");
+        Debug.Log($"[Lobby] Discord lobby ready. lobbyId={_currentDiscordLobbyId}, joinCode={CurrentJoinCode}, host={HostUserId}, localHosting={IsHosting}");
+    }
+
+    private static Dictionary<string, string> BuildHostLobbyMetadata(string joinCode, string hostAddress, ushort port, string voiceSecret, string hostUserId)
+    {
+        return new Dictionary<string, string>
+        {
+            [LobbyMetadataJoinCode] = joinCode,
+            [LobbyMetadataHostUserId] = hostUserId,
+            [LobbyMetadataHostAddress] = hostAddress,
+            [LobbyMetadataUtpPort] = port.ToString(),
+            [LobbyMetadataVoiceSecret] = voiceSecret,
+        };
+    }
+
+    private static Dictionary<string, string> BuildLocalMemberMetadata()
+    {
+        return new Dictionary<string, string>
+        {
+            ["discord_user_id"] = Managers.Discord.LocalUserId,
+            ["display_name"] = Managers.Discord.LocalDisplayName,
+        };
     }
 
     private static void CleanupExistingLobbyObjects()
@@ -370,13 +384,6 @@ public class LobbySessionManager
 
     private static string GenerateUniqueJoinCode()
     {
-        for (int i = 0; i < 100; i++)
-        {
-            string code = GenerateJoinCode();
-            if (!s_roomByJoinCode.ContainsKey(code))
-                return code;
-        }
-
         return GenerateJoinCode();
     }
 
@@ -401,7 +408,199 @@ public class LobbySessionManager
     private static string ResolveConfiguredHostAddress()
     {
         string configured = Util.GetEnv(LobbyHostAddressKey);
-        return string.IsNullOrWhiteSpace(configured) ? DefaultHostAddress : configured.Trim();
+        if (!string.IsNullOrWhiteSpace(configured))
+            return configured.Trim();
+
+        string detected = TryDetectLocalIPv4Address();
+        return string.IsNullOrWhiteSpace(detected) ? DefaultHostAddress : detected;
+    }
+
+    private static string TryDetectLocalIPv4Address()
+    {
+        try
+        {
+            using Socket socket = new(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
+            socket.Connect("8.8.8.8", 65530);
+            if (socket.LocalEndPoint is IPEndPoint endpoint && endpoint.Address != null)
+                return endpoint.Address.ToString();
+        }
+        catch
+        {
+        }
+
+        try
+        {
+            IPHostEntry entry = Dns.GetHostEntry(Dns.GetHostName());
+            for (int i = 0; i < entry.AddressList.Length; i++)
+            {
+                IPAddress address = entry.AddressList[i];
+                if (address.AddressFamily != AddressFamily.InterNetwork || IPAddress.IsLoopback(address))
+                    continue;
+
+                return address.ToString();
+            }
+        }
+        catch
+        {
+        }
+
+        return string.Empty;
+    }
+
+    private void HandleSessionLobbyUpdated(ulong lobbyId)
+    {
+        if (lobbyId != _currentDiscordLobbyId)
+            return;
+
+        _nextLobbyStateSyncTime = 0f;
+    }
+
+    private void HandleSessionLobbyMemberAdded(ulong lobbyId, ulong memberId)
+    {
+        if (lobbyId != _currentDiscordLobbyId)
+            return;
+
+        _nextLobbyStateSyncTime = 0f;
+    }
+
+    private void HandleSessionLobbyMemberRemoved(ulong lobbyId, ulong memberId)
+    {
+        if (lobbyId != _currentDiscordLobbyId)
+            return;
+
+        _nextLobbyStateSyncTime = 0f;
+    }
+
+    private void RefreshHostStateFromDiscordMetadata()
+    {
+        if (_currentDiscordLobbyId == 0)
+            return;
+
+        if (!Managers.Discord.TryGetSessionLobbyMetadata(_currentDiscordLobbyId, out Dictionary<string, string> metadata) || metadata == null)
+            return;
+
+        if (metadata.TryGetValue(LobbyMetadataJoinCode, out string metadataJoinCode) && !string.IsNullOrWhiteSpace(metadataJoinCode))
+            CurrentJoinCode = NormalizeJoinCode(metadataJoinCode);
+
+        if (metadata.TryGetValue(LobbyMetadataHostAddress, out string metadataHostAddress) && !string.IsNullOrWhiteSpace(metadataHostAddress))
+            _currentHostAddress = metadataHostAddress;
+
+        if (metadata.TryGetValue(LobbyMetadataUtpPort, out string metadataPort) && ushort.TryParse(metadataPort, out ushort parsedPort))
+            _currentPort = parsedPort;
+
+        if (metadata.TryGetValue(LobbyMetadataVoiceSecret, out string metadataVoiceSecret) && !string.IsNullOrWhiteSpace(metadataVoiceSecret))
+            _currentVoiceSecret = metadataVoiceSecret;
+
+        string metadataHostUserId = metadata.TryGetValue(LobbyMetadataHostUserId, out string storedHostUserId) ? storedHostUserId : string.Empty;
+
+        if (!Managers.Discord.TryGetSessionLobbyMemberIds(_currentDiscordLobbyId, out ulong[] memberIds) || memberIds == null || memberIds.Length == 0)
+            return;
+
+        string electedHostUserId = SelectHostUserId(memberIds, metadataHostUserId);
+        if (string.IsNullOrWhiteSpace(electedHostUserId))
+            return;
+
+        HostUserId = electedHostUserId;
+        bool localShouldHost = string.Equals(HostUserId, Managers.Discord.LocalUserId, StringComparison.Ordinal);
+
+        if (!string.Equals(metadataHostUserId, electedHostUserId, StringComparison.Ordinal) && localShouldHost)
+        {
+            PublishHostMetadataAsOwner();
+            return;
+        }
+
+        if (localShouldHost)
+        {
+            if (!IsHosting)
+            {
+                bool startedHost = TryStartUtpHost(_currentPort, out string hostAddress);
+                if (startedHost)
+                {
+                    IsHosting = true;
+                    _currentHostAddress = hostAddress;
+                    Debug.Log($"[Lobby] Host promoted via Discord metadata. joinCode={CurrentJoinCode}, host={HostUserId}");
+                }
+            }
+
+            return;
+        }
+
+        if (IsHosting)
+        {
+            TryStopUtp();
+            IsHosting = false;
+        }
+
+        TryStartUtpClient(_currentHostAddress, _currentPort);
+    }
+
+    private static string SelectHostUserId(ulong[] memberIds, string preferredHostUserId)
+    {
+        if (!string.IsNullOrWhiteSpace(preferredHostUserId) && ulong.TryParse(preferredHostUserId, out ulong preferredId))
+        {
+            for (int i = 0; i < memberIds.Length; i++)
+            {
+                if (memberIds[i] == preferredId)
+                    return preferredHostUserId;
+            }
+        }
+
+        ulong selected = memberIds[0];
+        for (int i = 1; i < memberIds.Length; i++)
+        {
+            if (memberIds[i] < selected)
+                selected = memberIds[i];
+        }
+
+        return selected.ToString();
+    }
+
+    private void PublishHostMetadataAsOwner()
+    {
+        if (_isUpdatingHostMetadata)
+            return;
+
+        _isUpdatingHostMetadata = true;
+
+        if (_currentPort == 0)
+            _currentPort = CalculatePort(CurrentJoinCode);
+
+        string hostAddress = ResolveConfiguredHostAddress();
+        bool startedHost = IsHosting || TryStartUtpHost(_currentPort, out hostAddress);
+        if (!startedHost)
+        {
+            _isUpdatingHostMetadata = false;
+            return;
+        }
+
+        IsHosting = true;
+        _currentHostAddress = hostAddress;
+
+        Dictionary<string, string> lobbyMetadata = BuildHostLobbyMetadata(CurrentJoinCode, _currentHostAddress, _currentPort, _currentVoiceSecret, Managers.Discord.LocalUserId);
+        bool requested = Managers.Discord.CreateOrJoinSessionLobby(
+            _currentVoiceSecret,
+            lobbyMetadata,
+            BuildLocalMemberMetadata(),
+            true,
+            HandleHostMetadataPublishCompleted);
+
+        if (!requested)
+            _isUpdatingHostMetadata = false;
+    }
+
+    private void HandleHostMetadataPublishCompleted(bool success, ulong lobbyId, string error)
+    {
+        _isUpdatingHostMetadata = false;
+
+        if (!success)
+        {
+            Debug.LogWarning($"[Lobby] Failed to publish promoted host metadata: {error}");
+            return;
+        }
+
+        _currentDiscordLobbyId = lobbyId;
+        HostUserId = Managers.Discord.LocalUserId;
+        _nextLobbyStateSyncTime = 0f;
     }
 
     private bool TryStartUtpHost(ushort port, out string hostAddress)
