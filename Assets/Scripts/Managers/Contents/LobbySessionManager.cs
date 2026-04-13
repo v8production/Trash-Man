@@ -650,25 +650,34 @@ public class LobbySessionManager
         hostAddress = DefaultHostAddress;
         try
         {
-            if (!TryResolveNetworkObjects(out Type networkManagerType, out MonoBehaviour networkManagerObject, out Component utpTransport))
+            if (!TryResolveNetworkObjects(out NetworkManager networkManager, out UnityTransport utpTransport))
                 return false;
+
+            if (networkManager.IsListening)
+            {
+                if (networkManager.IsServer)
+                {
+                    hostAddress = ResolveConfiguredHostAddress();
+                    return true;
+                }
+
+                networkManager.Shutdown();
+            }
 
             ConfigureTransportConnection(utpTransport, "0.0.0.0", port);
             hostAddress = ResolveConfiguredHostAddress();
 
-            MethodInfo startHostMethod = networkManagerType.GetMethod("StartHost", BindingFlags.Public | BindingFlags.Instance, null, Type.EmptyTypes, null);
-            if (startHostMethod == null)
+            bool started = networkManager.StartHost();
+            if (!started)
             {
-                Debug.LogWarning("UTP host start skipped: StartHost method not found on NetworkManager.");
-                return false;
+                Debug.LogWarning($"UTP host start returned false. isListening={networkManager.IsListening}, isServer={networkManager.IsServer}, isClient={networkManager.IsClient}, port={port}");
             }
 
-            object startedObject = startHostMethod.Invoke(networkManagerObject, null);
-            return startedObject is bool started && started;
+            return started;
         }
         catch (Exception e)
         {
-            Debug.LogWarning($"UTP host start failed: {e.Message}");
+            Debug.LogWarning($"UTP host start failed: {e}");
             return false;
         }
     }
@@ -677,20 +686,23 @@ public class LobbySessionManager
     {
         try
         {
-            if (!TryResolveNetworkObjects(out Type networkManagerType, out MonoBehaviour networkManagerObject, out Component utpTransport))
+            if (!TryResolveNetworkObjects(out NetworkManager networkManager, out UnityTransport utpTransport))
                 return false;
+
+            if (networkManager.IsListening)
+            {
+                if (networkManager.IsClient && !networkManager.IsServer)
+                {
+                    Debug.Log($"[Lobby] StartClient skipped: already connected. host={hostAddress}, port={port}");
+                    return true;
+                }
+
+                networkManager.Shutdown();
+            }
 
             ConfigureTransportConnection(utpTransport, hostAddress, port);
 
-            MethodInfo startClientMethod = networkManagerType.GetMethod("StartClient", BindingFlags.Public | BindingFlags.Instance, null, Type.EmptyTypes, null);
-            if (startClientMethod == null)
-            {
-                Debug.LogWarning("UTP client start skipped: StartClient method not found on NetworkManager.");
-                return false;
-            }
-
-            object startedObject = startClientMethod.Invoke(networkManagerObject, null);
-            bool started = startedObject is bool boolValue && boolValue;
+            bool started = networkManager.StartClient();
             Debug.Log($"[Lobby] StartClient requested. host={hostAddress}, port={port}, started={started}");
             return started;
         }
@@ -705,17 +717,13 @@ public class LobbySessionManager
     {
         try
         {
-            if (!TryResolveNetworkObjects(out _, out MonoBehaviour networkManagerObject, out _))
+            if (!TryResolveNetworkObjects(out NetworkManager networkManager, out _))
                 return false;
 
-            MethodInfo shutdownMethod = networkManagerObject.GetType().GetMethod("Shutdown", BindingFlags.Public | BindingFlags.Instance, null, Type.EmptyTypes, null);
-            if (shutdownMethod == null)
-            {
-                Debug.LogWarning("UTP stop skipped: Shutdown method not found on NetworkManager.");
-                return false;
-            }
+            if (!networkManager.IsListening)
+                return true;
 
-            shutdownMethod.Invoke(networkManagerObject, null);
+            networkManager.Shutdown();
             return true;
         }
         catch (Exception e)
@@ -725,22 +733,19 @@ public class LobbySessionManager
         }
     }
 
-    private static bool TryResolveNetworkObjects(out Type networkManagerType, out MonoBehaviour networkManagerObject, out Component utpTransport)
+    private static bool TryResolveNetworkObjects(out NetworkManager networkManager, out UnityTransport utpTransport)
     {
-        if (!LobbyNetworkRuntime.EnsureSetup(out NetworkManager networkManager, out UnityTransport transport))
+        if (!LobbyNetworkRuntime.EnsureSetup(out networkManager, out UnityTransport transport))
         {
-            networkManagerType = null;
-            networkManagerObject = null;
+            networkManager = null;
             utpTransport = null;
             Debug.LogWarning("UTP operation skipped: runtime NGO bootstrap failed.");
             return false;
         }
 
-        networkManagerType = typeof(NetworkManager);
-        networkManagerObject = networkManager;
         utpTransport = transport;
 
-        if (networkManagerObject == null)
+        if (networkManager == null)
         {
             if (!s_loggedNetworkManagerMissing)
             {

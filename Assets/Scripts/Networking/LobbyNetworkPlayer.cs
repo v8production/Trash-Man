@@ -27,6 +27,7 @@ public class LobbyNetworkPlayer : NetworkBehaviour
     {
         base.OnNetworkSpawn();
         gameObject.hideFlags = HideFlags.None;
+        EnsureVisualComponentsEnabled();
         _discordUserId.OnValueChanged += HandleIdentityChanged;
         _displayName.OnValueChanged += HandleIdentityChanged;
 
@@ -79,6 +80,17 @@ public class LobbyNetworkPlayer : NetworkBehaviour
 
         if (_characterController != null)
             _characterController.enabled = IsOwner;
+    }
+
+    private void EnsureVisualComponentsEnabled()
+    {
+        Renderer[] renderers = GetComponentsInChildren<Renderer>(true);
+        for (int i = 0; i < renderers.Length; i++)
+            renderers[i].enabled = true;
+
+        Animator[] animators = GetComponentsInChildren<Animator>(true);
+        for (int i = 0; i < animators.Length; i++)
+            animators[i].enabled = true;
     }
 
     private void EnsureLocalCamera()

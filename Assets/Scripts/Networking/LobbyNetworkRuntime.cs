@@ -43,6 +43,12 @@ public static class LobbyNetworkRuntime
         if (playerPrefab == null)
             return false;
 
+        if (networkManager.NetworkConfig == null)
+            networkManager.NetworkConfig = new NetworkConfig();
+
+        if (networkManager.NetworkConfig.Prefabs == null)
+            networkManager.NetworkConfig.Prefabs = new NetworkPrefabs();
+
         networkManager.NetworkConfig.NetworkTransport = transport;
         networkManager.NetworkConfig.EnableSceneManagement = false;
         networkManager.NetworkConfig.ConnectionApproval = false;
@@ -66,8 +72,16 @@ public static class LobbyNetworkRuntime
 
         s_runtimePlayerPrefab = Object.Instantiate(rangerPrefab);
         s_runtimePlayerPrefab.name = "@RangerNetworkPlayerPrefab";
-        s_runtimePlayerPrefab.transform.position = new Vector3(10000f, -10000f, 10000f);
+        s_runtimePlayerPrefab.transform.position = Vector3.zero;
         s_runtimePlayerPrefab.hideFlags = HideFlags.HideInHierarchy | HideFlags.DontSave;
+
+        Renderer[] templateRenderers = s_runtimePlayerPrefab.GetComponentsInChildren<Renderer>(true);
+        for (int i = 0; i < templateRenderers.Length; i++)
+            templateRenderers[i].enabled = false;
+
+        Animator templateAnimator = s_runtimePlayerPrefab.GetComponentInChildren<Animator>(true);
+        if (templateAnimator != null)
+            templateAnimator.enabled = false;
 
         RangerController rangerController = s_runtimePlayerPrefab.GetComponent<RangerController>();
         if (rangerController != null)
@@ -81,7 +95,16 @@ public static class LobbyNetworkRuntime
         EnsureGlobalObjectIdHash(networkObject, LobbyPlayerPrefabHash);
 
         s_runtimePlayerPrefab.GetorAddComponent<OwnerNetworkTransform>();
-        s_runtimePlayerPrefab.GetorAddComponent<OwnerNetworkAnimator>();
+        OwnerNetworkAnimator ownerNetworkAnimator = s_runtimePlayerPrefab.GetorAddComponent<OwnerNetworkAnimator>();
+        if (ownerNetworkAnimator.Animator == null)
+            ownerNetworkAnimator.Animator = s_runtimePlayerPrefab.GetComponentInChildren<Animator>(true);
+
+        if (ownerNetworkAnimator.Animator == null)
+        {
+            ownerNetworkAnimator.enabled = false;
+            Debug.LogWarning("[Lobby] OwnerNetworkAnimator disabled: Animator not found on runtime player prefab.");
+        }
+
         s_runtimePlayerPrefab.GetorAddComponent<LobbyNetworkPlayer>();
 
         return s_runtimePlayerPrefab;
