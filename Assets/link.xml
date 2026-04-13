@@ -1,0 +1,6 @@
+<linker>
+  <assembly fullname="Discord.Sdk" preserve="all" />
+  <assembly fullname="Unity.Netcode.Runtime">
+    <type fullname="Unity.Netcode.NetworkObject" preserve="all" />
+  </assembly>
+</linker>

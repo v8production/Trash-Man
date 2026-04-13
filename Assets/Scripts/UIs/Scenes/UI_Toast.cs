@@ -27,10 +27,16 @@ public class UI_Toast : UI_Scene
 
     public override void Init()
     {
+        if (_isInitialized)
+            return;
+
         Managers.UI.ShowCanvas(gameObject, 99);
 
         Bind<TextMeshProUGUI>(typeof(Texts));
         Bind<Image>(typeof(Images));
+
+        _bubbleCanvasGroup = gameObject.GetorAddComponent<CanvasGroup>();
+        _isInitialized = true;
     }
 
     public void ShowBossMessage(string message, float holdDurationOverride = -1f)

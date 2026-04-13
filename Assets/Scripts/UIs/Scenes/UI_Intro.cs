@@ -6,9 +6,7 @@ using UnityEngine.UI;
 public class UI_Intro : UI_Scene
 {
     [Header("Discord Social SDK")]
-    [SerializeField] private string _discordScopes = "openid sdk.social_layer";
-
-    private const string DiscordApplicationIdKey = "DISCORD_APPLICATION_ID";
+    [SerializeField] private string _discordScopes = string.Empty;
 
     enum Images
     {
@@ -60,14 +58,16 @@ public class UI_Intro : UI_Scene
         if (Managers.Discord.IsLinked || Managers.Discord.IsConnecting)
             return;
 
-        string appIdText = Util.GetEnv(DiscordApplicationIdKey);
-        if (!ulong.TryParse(appIdText, out ulong appId) || appId == 0)
+        if (!Util.TryGetDiscordApplicationId(out ulong appId))
         {
-            Debug.LogError($"UI_Intro: Discord connect failed - set {DiscordApplicationIdKey} in process env or .env(.local/.dev/.prod) files.");
+            const string errorMessage = "UI_Intro: Discord connect failed - Discord application id is not configured.";
+            Debug.LogError(errorMessage);
+            Managers.Toast.EnqueueMessage("Discord app ID is missing.", 2.5f);
             return;
         }
 
-        Managers.Discord.Connect(appId, _discordScopes);
+        string scopes = _discordScopes == "openid sdk.social_layer" ? string.Empty : _discordScopes;
+        Managers.Discord.Connect(appId, scopes);
         ApplyDiscordConnectState();
     }
 

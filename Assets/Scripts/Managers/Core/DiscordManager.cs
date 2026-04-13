@@ -21,7 +21,7 @@ public readonly struct DiscordLobbyUser
 
 public class DiscordManager
 {
-    private const string DefaultScopes = "openid sdk.social_layer";
+    private const string LegacyDefaultScopes = "openid sdk.social_layer";
     private const string ClientTypeName = "Discord.Sdk.Client, Discord.Sdk";
     private const string AuthArgsTypeName = "Discord.Sdk.AuthorizationArgs, Discord.Sdk";
     private const string AuthTokenTypeName = "Discord.Sdk.AuthorizationTokenType, Discord.Sdk";
@@ -52,7 +52,7 @@ public class DiscordManager
     private ulong _applicationId;
     private ulong _activeVoiceLobbyId;
     private ulong _pendingLeaveLobbyId;
-    private string _scopes = DefaultScopes;
+    private string _scopes = LegacyDefaultScopes;
 
     private readonly Dictionary<string, ulong> _sessionLobbyIdBySecret = new();
     private Action<bool, ulong, string> _sessionLobbyJoinCompletion;
@@ -129,7 +129,7 @@ public class DiscordManager
         }
 
         _applicationId = applicationId;
-        _scopes = string.IsNullOrWhiteSpace(scopes) ? DefaultScopes : scopes;
+        _scopes = ResolveScopes(scopes);
         _pendingCodeVerifier = string.Empty;
         IsConnecting = true;
         LastAuthError = null;
@@ -529,6 +529,26 @@ public class DiscordManager
             SetConnectFailed($"Discord SDK initialization failed: {e.Message}");
             return false;
         }
+    }
+
+    private string ResolveScopes(string scopes)
+    {
+        if (!string.IsNullOrWhiteSpace(scopes))
+            return scopes;
+
+        try
+        {
+            Type clientType = Type.GetType(ClientTypeName, false);
+            MethodInfo defaultCommunicationScopesMethod = clientType?.GetMethod("GetDefaultCommunicationScopes", BindingFlags.Public | BindingFlags.Static, null, Type.EmptyTypes, null);
+            if (defaultCommunicationScopesMethod?.Invoke(null, null) is string defaultCommunicationScopes && !string.IsNullOrWhiteSpace(defaultCommunicationScopes))
+                return defaultCommunicationScopes;
+        }
+        catch (Exception e)
+        {
+            LogVoice($"Falling back to legacy Discord scopes because default communication scopes lookup failed: {e.Message}");
+        }
+
+        return LegacyDefaultScopes;
     }
 
     private Delegate CreateClientCallback(string nestedDelegateName, Action<object[]> bridge)

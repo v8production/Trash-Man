@@ -4,6 +4,8 @@ using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Reflection;
+using Unity.Netcode;
+using Unity.Netcode.Transports.UTP;
 using UnityEngine;
 
 public class LobbySessionManager
@@ -14,7 +16,6 @@ public class LobbySessionManager
     private const ushort BaseLobbyPort = 18000;
     private const ushort LobbyPortRange = 2000;
     private const string DefaultHostAddress = "127.0.0.1";
-    private const string LobbyHostAddressKey = "LOBBY_HOST_ADDRESS";
     private const string VoiceSecretPrefix = "trash-man-lobby";
     private const string LobbyMetadataJoinCode = "join_code";
     private const string LobbyMetadataHostUserId = "host_user_id";
@@ -104,6 +105,32 @@ public class LobbySessionManager
     {
         string joinCode = NormalizeJoinCode(rawJoinCode);
         return !string.IsNullOrWhiteSpace(joinCode);
+    }
+
+    public void RegisterLobbyUserObjects(string userId, RangerController ranger, UI_Nickname nickname)
+    {
+        if (string.IsNullOrWhiteSpace(userId))
+            return;
+
+        if (ranger != null)
+            _rangersByUserId[userId] = ranger;
+
+        if (nickname != null)
+            _nicknamesByUserId[userId] = nickname;
+
+        LobbyScene.RegisterUserObjects(userId, ranger, nickname);
+    }
+
+    public void UnregisterLobbyUserObjects(string userId, RangerController ranger, UI_Nickname nickname)
+    {
+        if (string.IsNullOrWhiteSpace(userId))
+            return;
+
+        if (_rangersByUserId.TryGetValue(userId, out RangerController storedRanger) && storedRanger == ranger)
+            _rangersByUserId.Remove(userId);
+
+        if (_nicknamesByUserId.TryGetValue(userId, out UI_Nickname storedNickname) && storedNickname == nickname)
+            _nicknamesByUserId.Remove(userId);
     }
 
     public bool JoinLobbyByCode(string rawJoinCode)
@@ -200,6 +227,12 @@ public class LobbySessionManager
 
         HostUserId = Managers.Discord.LocalUserId;
         IsHosting = TryStartUtpHost(roomPort, out string hostAddress);
+        if (!IsHosting)
+        {
+            Debug.LogWarning("[Lobby] Host bootstrap failed: UTP host did not start.");
+            Managers.Toast.EnqueueMessage("Failed to start lobby host. Check Netcode/Transport setup.", 3f);
+            return;
+        }
 
         CurrentJoinCode = joinCode;
         _currentPort = roomPort;
@@ -218,7 +251,12 @@ public class LobbySessionManager
             (success, lobbyId, error) => HandleDiscordLobbyJoined(success, lobbyId, _currentVoiceSecret, true, error));
 
         if (!requested)
+        {
             Debug.LogWarning("[Lobby] Host bootstrap failed: Discord session request not issued.");
+            TryStopUtp();
+            IsHosting = false;
+            HostUserId = string.Empty;
+        }
     }
 
     private void HandleDiscordLobbyJoined(bool success, ulong lobbyId, string lobbySecret, bool requestedAsHost, string error)
@@ -226,6 +264,13 @@ public class LobbySessionManager
         if (!success || lobbyId == 0)
         {
             Debug.LogWarning($"[Lobby] Discord lobby join failed. requestedAsHost={requestedAsHost}, error={error}");
+            if (requestedAsHost)
+            {
+                TryStopUtp();
+                IsHosting = false;
+                HostUserId = string.Empty;
+            }
+
             Managers.Toast.EnqueueMessage("Lobby join failed. Please try again.", 2.5f);
             Managers.Scene.LoadScene(Define.Scene.Intro);
             return;
@@ -256,12 +301,13 @@ public class LobbySessionManager
 
         IsHosting = requestedAsHost || string.Equals(HostUserId, Managers.Discord.LocalUserId, StringComparison.Ordinal);
 
-        if (!IsHosting)
-            TryStartUtpClient(_currentHostAddress, _currentPort);
-
-        RangerController ranger = SpawnRangerForLocalUser();
-        SetupLobbyCamera(ranger);
-        SetupNicknameForLocalUser(ranger);
+        if (!IsHosting && !TryStartUtpClient(_currentHostAddress, _currentPort))
+        {
+            Debug.LogWarning($"[Lobby] Failed to start UTP client. host={_currentHostAddress}, port={_currentPort}");
+            Managers.Toast.EnqueueMessage("Failed to connect to lobby host.", 2.5f);
+            Managers.Scene.LoadScene(Define.Scene.Intro);
+            return;
+        }
 
         Managers.Discord.NotifyLobbyUserJoined(Managers.Discord.LocalUserId, Managers.Discord.LocalDisplayName, true);
         Managers.Discord.EnsureLobbyVoiceConnected(_currentVoiceSecret);
@@ -407,10 +453,6 @@ public class LobbySessionManager
 
     private static string ResolveConfiguredHostAddress()
     {
-        string configured = Util.GetEnv(LobbyHostAddressKey);
-        if (!string.IsNullOrWhiteSpace(configured))
-            return configured.Trim();
-
         string detected = TryDetectLocalIPv4Address();
         return string.IsNullOrWhiteSpace(detected) ? DefaultHostAddress : detected;
     }
@@ -685,29 +727,18 @@ public class LobbySessionManager
 
     private static bool TryResolveNetworkObjects(out Type networkManagerType, out MonoBehaviour networkManagerObject, out Component utpTransport)
     {
-        networkManagerType = Type.GetType("Unity.Netcode.NetworkManager, Unity.Netcode.Runtime");
-        networkManagerObject = null;
-        utpTransport = null;
-
-        if (networkManagerType == null)
+        if (!LobbyNetworkRuntime.EnsureSetup(out NetworkManager networkManager, out UnityTransport transport))
         {
-            if (!s_loggedNetcodeMissing)
-            {
-                Debug.LogWarning("UTP operation skipped: Netcode for GameObjects package is not installed.");
-                s_loggedNetcodeMissing = true;
-            }
+            networkManagerType = null;
+            networkManagerObject = null;
+            utpTransport = null;
+            Debug.LogWarning("UTP operation skipped: runtime NGO bootstrap failed.");
             return false;
         }
 
-        MonoBehaviour[] behaviours = UnityEngine.Object.FindObjectsByType<MonoBehaviour>(FindObjectsSortMode.None);
-        for (int i = 0; i < behaviours.Length; i++)
-        {
-            if (behaviours[i] != null && networkManagerType.IsAssignableFrom(behaviours[i].GetType()))
-            {
-                networkManagerObject = behaviours[i];
-                break;
-            }
-        }
+        networkManagerType = typeof(NetworkManager);
+        networkManagerObject = networkManager;
+        utpTransport = transport;
 
         if (networkManagerObject == null)
         {
@@ -719,7 +750,6 @@ public class LobbySessionManager
             return false;
         }
 
-        utpTransport = networkManagerObject.GetComponent("Unity.Netcode.Transports.UTP.UnityTransport");
         if (utpTransport == null)
         {
             if (!s_loggedTransportMissing)

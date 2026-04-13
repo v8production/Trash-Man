@@ -4,10 +4,9 @@ using System.Collections.Generic;
 
 public class LobbyScene : BaseScene
 {
-    private const string DiscordApplicationIdKey = "DISCORD_APPLICATION_ID";
-    private const string DiscordLobbyVoiceSecretKey = "DISCORD_LOBBY_VOICE_SECRET";
-
     private UI_LobbyMenu _lobbyMenu;
+    private bool _pendingHostBootstrap;
+    private string _pendingJoinCode = string.Empty;
 
     private static readonly Dictionary<string, LobbyUserEntry> s_userEntriesByDiscordUserId = new();
 
@@ -61,20 +60,12 @@ public class LobbyScene : BaseScene
         Managers.Input.SetMode(Define.InputMode.Player);
         EnsureLobbyMenu();
 
-        if (Managers.Scene.ConsumeLobbyHostRequest())
-            Managers.LobbySession.BootstrapLocalHostLobby();
-        else if (Managers.Scene.ConsumeLobbyJoinCodeRequest(out string joinCode))
-        {
-            if (!Managers.LobbySession.JoinLobbyByCode(joinCode))
-            {
-                Managers.Chat.EnqueueMessage("Failed to join lobby with that code.", 2.5f);
-                Managers.Scene.LoadScene(Define.Scene.Intro);
-                return;
-            }
-        }
+        _pendingHostBootstrap = Managers.Scene.ConsumeLobbyHostRequest();
+        _pendingJoinCode = Managers.Scene.ConsumeLobbyJoinCodeRequest(out string joinCode) ? joinCode : string.Empty;
 
         Managers.Discord.OnAuthStateChanged -= HandleDiscordAuthStateChanged;
         Managers.Discord.OnAuthStateChanged += HandleDiscordAuthStateChanged;
+        ProcessPendingLobbyRequest();
         TryAutoConnectLobbyVoice();
     }
 
@@ -94,12 +85,43 @@ public class LobbyScene : BaseScene
     private static void LoadManagers()
     {
         _ = Managers.Input;
+        Managers.LobbySession.Init();
     }
 
     private void HandleDiscordAuthStateChanged()
     {
         LogLobbyVoice($"Discord auth state changed. linked={Managers.Discord.IsLinked}, connecting={Managers.Discord.IsConnecting}, lastError={Managers.Discord.LastAuthError}");
+        ProcessPendingLobbyRequest();
         TryAutoConnectLobbyVoice();
+    }
+
+    private void ProcessPendingLobbyRequest()
+    {
+        if (!Managers.Discord.IsLinked)
+        {
+            if (_pendingHostBootstrap || !string.IsNullOrWhiteSpace(_pendingJoinCode))
+                LogLobbyVoice("Pending lobby request is waiting for Discord link readiness.");
+
+            return;
+        }
+
+        if (_pendingHostBootstrap)
+        {
+            _pendingHostBootstrap = false;
+            Managers.LobbySession.BootstrapLocalHostLobby();
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(_pendingJoinCode))
+            return;
+
+        string joinCode = _pendingJoinCode;
+        _pendingJoinCode = string.Empty;
+        if (!Managers.LobbySession.JoinLobbyByCode(joinCode))
+        {
+            Managers.Chat.EnqueueMessage("Failed to join lobby with that code.", 2.5f);
+            Managers.Scene.LoadScene(Define.Scene.Intro);
+        }
     }
 
     private void EnsureLobbyMenu()
@@ -140,11 +162,11 @@ public class LobbyScene : BaseScene
                 return;
             }
 
-            string appIdText = Util.GetEnv(DiscordApplicationIdKey);
-            LogLobbyVoice($"Resolved {DiscordApplicationIdKey} value. hasValue={!string.IsNullOrWhiteSpace(appIdText)}");
-            if (!ulong.TryParse(appIdText, out ulong appId) || appId == 0)
+            bool hasAppId = Util.TryGetDiscordApplicationId(out ulong appId);
+            LogLobbyVoice($"Resolved Discord application id. hasValue={hasAppId}");
+            if (!hasAppId)
             {
-                Debug.LogWarning($"LobbyScene: Discord auto-connect skipped - set {DiscordApplicationIdKey} in process env or .env files.");
+                Debug.LogWarning("LobbyScene: Discord auto-connect skipped - Discord application id is not configured.");
                 return;
             }
 
@@ -163,10 +185,6 @@ public class LobbyScene : BaseScene
         string activeVoiceSecret = Managers.LobbySession.CurrentVoiceSecret;
         if (!string.IsNullOrWhiteSpace(activeVoiceSecret))
             return activeVoiceSecret;
-
-        string configuredSecret = Util.GetEnv(DiscordLobbyVoiceSecretKey);
-        if (!string.IsNullOrWhiteSpace(configuredSecret))
-            return configuredSecret.Trim();
 
         string joinCode = Managers.LobbySession.CurrentJoinCode;
         if (!string.IsNullOrWhiteSpace(joinCode))
