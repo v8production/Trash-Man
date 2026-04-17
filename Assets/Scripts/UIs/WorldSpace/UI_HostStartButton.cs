@@ -66,8 +66,8 @@ public class UI_HostStartButton : MonoBehaviour
         if (_buttonRoot == null)
             _buttonRoot = FindButtonRoot();
 
-        if (_startButton == null && _buttonRoot != null)
-            _startButton = _buttonRoot.GetComponentInChildren<Button>(true);
+        if (_startButton == null)
+            _startButton = FindStartButton();
 
         if (_outlineRenderers == null || _outlineRenderers.Length == 0)
             _outlineRenderers = GetComponentsInChildren<Renderer>(true);
@@ -215,11 +215,34 @@ public class UI_HostStartButton : MonoBehaviour
 
     private GameObject FindButtonRoot()
     {
-        Transform byName = transform.Find("HostStartButton");
-        if (byName != null)
-            return byName.gameObject;
+        Transform byUiName = transform.Find("UI_HostStartButton");
+        if (byUiName != null)
+            return byUiName.gameObject;
 
-        Debug.LogWarning("[Lobby] HostStartButton object is not assigned. Set _buttonRoot in inspector.");
+        Transform legacy = transform.Find("HostStartButton");
+        if (legacy != null)
+            return legacy.gameObject;
+
+        if (transform.name == "UI_HostStartButton")
+            return gameObject;
+
+        Debug.LogWarning("[Lobby] UI_HostStartButton object is not assigned. Set _buttonRoot in inspector.");
         return null;
+    }
+
+    private Button FindStartButton()
+    {
+        if (_buttonRoot == null)
+            return null;
+
+        Transform startButtonRoot = _buttonRoot.transform.Find("StartButton");
+        if (startButtonRoot != null)
+        {
+            Button direct = startButtonRoot.GetComponent<Button>();
+            if (direct != null)
+                return direct;
+        }
+
+        return _buttonRoot.GetComponentInChildren<Button>(true);
     }
 }

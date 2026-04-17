@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEngine.UI;
 
 public class LobbyScene : BaseScene
 {
@@ -13,6 +14,16 @@ public class LobbyScene : BaseScene
     private LobbyCameraController _localLobbyCamera;
     private const string LobbyCameraPrefabName = "Lobby_Camera";
 
+    private readonly List<RoleButtonBinding> _roleButtonBindings = new();
+    private static readonly RoleButtonSetup[] s_roleButtonSetups =
+    {
+        new("UI_BodyButton", Define.TitanRole.Body),
+        new("UI_LeftArmButton", Define.TitanRole.LeftArm),
+        new("UI_RightArmButton", Define.TitanRole.RightArm),
+        new("UI_LeftLegButton", Define.TitanRole.LeftLeg),
+        new("UI_RightLegButton", Define.TitanRole.RightLeg),
+    };
+
     private static readonly Dictionary<string, LobbyUserEntry> s_userEntriesByDiscordUserId = new();
 
     private sealed class LobbyUserEntry
@@ -20,6 +31,24 @@ public class LobbyScene : BaseScene
         public RangerController Ranger;
         public UI_Nickname Nickname;
         public int SelectedRole;
+    }
+
+    private readonly struct RoleButtonSetup
+    {
+        public RoleButtonSetup(string objectName, Define.TitanRole role)
+        {
+            ObjectName = objectName;
+            Role = role;
+        }
+
+        public string ObjectName { get; }
+        public Define.TitanRole Role { get; }
+    }
+
+    private sealed class RoleButtonBinding
+    {
+        public Button Button;
+        public UnityEngine.Events.UnityAction Listener;
     }
 
     public static void RegisterUserObjects(string userId, RangerController ranger, UI_Nickname nickname)
@@ -99,6 +128,7 @@ public class LobbyScene : BaseScene
         EnsureLobbyMenu();
         EnsureLoadingUI();
         EnsureScreenHostStartButton();
+        EnsureScreenRoleButtons();
 
         _pendingHostBootstrap = Managers.Scene.ConsumeLobbyHostRequest();
         _pendingJoinCode = Managers.Scene.ConsumeLobbyJoinCodeRequest(out string joinCode) ? joinCode : string.Empty;
@@ -134,6 +164,8 @@ public class LobbyScene : BaseScene
 
         if (_screenHostStartButton != null)
             _screenHostStartButton.StartButtonClicked -= HandleHostStartButtonClicked;
+
+        UnbindScreenRoleButtons();
     }
 
     private static void LoadManagers()
@@ -275,6 +307,84 @@ public class LobbyScene : BaseScene
         _screenHostStartButton.StartButtonClicked += HandleHostStartButtonClicked;
     }
 
+    private void EnsureScreenRoleButtons()
+    {
+        if (_roleButtonBindings.Count > 0)
+            return;
+
+        GameObject screen = GameObject.Find("Screen");
+        if (screen == null)
+        {
+            Debug.LogWarning("[Lobby] Screen object was not found. Role button setup skipped.");
+            return;
+        }
+
+        for (int i = 0; i < s_roleButtonSetups.Length; i++)
+        {
+            RoleButtonSetup setup = s_roleButtonSetups[i];
+            Transform root = screen.transform.Find(setup.ObjectName);
+            if (root == null)
+            {
+                Debug.LogWarning($"[Lobby] {setup.ObjectName} object was not found under Screen.");
+                continue;
+            }
+
+            Button roleButton = root.GetComponentInChildren<Button>(true);
+            if (roleButton == null)
+            {
+                Debug.LogWarning($"[Lobby] {setup.ObjectName} has no Button component in children.");
+                continue;
+            }
+
+            Define.TitanRole role = setup.Role;
+            UnityEngine.Events.UnityAction listener = () => HandleRoleButtonClicked(role);
+            roleButton.onClick.AddListener(listener);
+
+            _roleButtonBindings.Add(new RoleButtonBinding
+            {
+                Button = roleButton,
+                Listener = listener,
+            });
+        }
+    }
+
+    private void UnbindScreenRoleButtons()
+    {
+        for (int i = 0; i < _roleButtonBindings.Count; i++)
+        {
+            RoleButtonBinding binding = _roleButtonBindings[i];
+            if (binding.Button == null || binding.Listener == null)
+                continue;
+
+            binding.Button.onClick.RemoveListener(binding.Listener);
+        }
+
+        _roleButtonBindings.Clear();
+    }
+
+    private void HandleRoleButtonClicked(Define.TitanRole role)
+    {
+        if (_isLobbySetupPending || !Managers.LobbySession.HasJoinedLobbySession)
+            return;
+
+        TrySelectLocalRole(role);
+    }
+
+    private bool TrySelectLocalRole(Define.TitanRole selectedRole)
+    {
+        LobbyNetworkPlayer localPlayer = FindLocalOwnedNetworkPlayer();
+        if (localPlayer == null)
+            return false;
+
+        localPlayer.SelectTitanRole(selectedRole);
+
+        if (localPlayer.TryGetLobbyUserId(out string lobbyUserId))
+            RegisterUserPartSelection(lobbyUserId, (int)selectedRole);
+
+        Managers.Toast.EnqueueMessage($"Selected part: {GetRoleLabel(selectedRole)}", 1.4f);
+        return true;
+    }
+
     private void EnsureLocalLobbyCameraReady()
     {
         if (!Managers.LobbySession.HasJoinedLobbySession)
@@ -322,16 +432,7 @@ public class LobbyScene : BaseScene
         if (!TryReadRoleSelectionInput(out Define.TitanRole selectedRole))
             return;
 
-        LobbyNetworkPlayer localPlayer = FindLocalOwnedNetworkPlayer();
-        if (localPlayer == null)
-            return;
-
-        localPlayer.SelectTitanRole(selectedRole);
-
-        if (localPlayer.TryGetLobbyUserId(out string lobbyUserId))
-            RegisterUserPartSelection(lobbyUserId, (int)selectedRole);
-
-        Managers.Toast.EnqueueMessage($"Selected part: {GetRoleLabel(selectedRole)}", 1.4f);
+        TrySelectLocalRole(selectedRole);
     }
 
     private static bool TryReadRoleSelectionInput(out Define.TitanRole selectedRole)
@@ -545,6 +646,8 @@ public class LobbyScene : BaseScene
 
         if (_screenHostStartButton != null)
             _screenHostStartButton.StartButtonClicked -= HandleHostStartButtonClicked;
+
+        UnbindScreenRoleButtons();
 
         _localLobbyCamera = null;
         _screenHostStartButton = null;

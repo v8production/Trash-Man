@@ -118,17 +118,26 @@ public class RangerController : MonoBehaviour
 
         if (_cameraController != null)
         {
-            forward = _cameraController.transform.forward;
-            right = _cameraController.transform.right;
+            forward = Vector3.ProjectOnPlane(_cameraController.transform.forward, Vector3.up);
+            right = Vector3.ProjectOnPlane(_cameraController.transform.right, Vector3.up);
         }
         else
         {
-            forward = transform.forward;
-            right = transform.right;
+            forward = Vector3.ProjectOnPlane(transform.forward, Vector3.up);
+            right = Vector3.ProjectOnPlane(transform.right, Vector3.up);
         }
 
+        if (forward.sqrMagnitude > 0.0001f)
+            forward.Normalize();
+        else
+            forward = Vector3.forward;
+
+        if (right.sqrMagnitude > 0.0001f)
+            right.Normalize();
+        else
+            right = Vector3.right;
+
         Vector3 direction = (right * moveInput.x) + (forward * moveInput.y);
-        direction = Vector3.ProjectOnPlane(direction, Vector3.up);
         return Vector3.ClampMagnitude(direction, 1f);
     }
 
@@ -142,3 +151,4 @@ public class RangerController : MonoBehaviour
         return mainCamera != null ? mainCamera.GetComponent<LobbyCameraController>() : null;
     }
 }
+
