@@ -9,7 +9,7 @@ public class LobbyScene : BaseScene
     private bool _pendingHostBootstrap;
     private bool _isLobbySetupPending;
     private string _pendingJoinCode = string.Empty;
-    private LobbyScreenHostStartButton _screenHostStartButton;
+    private UI_HostStartButton _screenHostStartButton;
     private LobbyCameraController _localLobbyCamera;
     private const string LobbyCameraPrefabName = "Lobby_Camera";
 
@@ -264,10 +264,10 @@ public class LobbyScene : BaseScene
             return;
         }
 
-        _screenHostStartButton = screen.GetComponent<LobbyScreenHostStartButton>();
+        _screenHostStartButton = screen.GetComponent<UI_HostStartButton>();
         if (_screenHostStartButton == null)
         {
-            Debug.LogWarning("[Lobby] LobbyScreenHostStartButton is missing on Screen. Attach it in scene and keep button root hidden by default.");
+            Debug.LogWarning("[Lobby] UI_HostStartButton is missing on Screen. Attach it in scene and keep button root hidden by default.");
             return;
         }
 

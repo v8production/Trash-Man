@@ -2,7 +2,7 @@ using System;
 using UnityEngine;
 using UnityEngine.UI;
 
-public class LobbyScreenHostStartButton : MonoBehaviour
+public class UI_HostStartButton : MonoBehaviour
 {
     [SerializeField] private GameObject _buttonRoot;
     [SerializeField] private Button _startButton;

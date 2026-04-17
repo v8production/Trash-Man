@@ -76,7 +76,7 @@ public class UI_Nickname : UI_Base
         }
 
         Transform anchorTarget = _anchorTarget != null ? _anchorTarget : _target;
-        Vector3 worldAnchor = GetTargetTop(anchorTarget) + worldOffset;
+        Vector3 worldAnchor = GetTargetCenter(anchorTarget) + worldOffset;
         Vector3 screenPoint = cam.WorldToScreenPoint(worldAnchor);
 
         if (screenPoint.z <= 0f)
@@ -168,22 +168,25 @@ public class UI_Nickname : UI_Base
         _textRect.sizeDelta = size;
     }
 
-    private static Vector3 GetTargetTop(Transform target)
+    private static Vector3 GetTargetCenter(Transform target)
     {
         if (target == null)
             return Vector3.zero;
 
-        CharacterController characterController = target.GetComponent<CharacterController>();
-        if (characterController != null)
-            return characterController.center + Vector3.up * characterController.height;
+        if (target.TryGetComponent(out IInteractGuideAnchorProvider anchorProvider))
+            return anchorProvider.GetInteractGuideAnchorWorldPosition();
 
         Collider collider = target.GetComponent<Collider>();
         if (collider != null)
-            return collider.bounds.center + Vector3.up * collider.bounds.extents.y;
+            return collider.bounds.center;
+
+        Collider colliderInChildren = target.GetComponentInChildren<Collider>();
+        if (colliderInChildren != null)
+            return colliderInChildren.bounds.center;
 
         Renderer renderer = target.GetComponentInChildren<Renderer>();
         if (renderer != null)
-            return renderer.bounds.center + Vector3.up * renderer.bounds.extents.y;
+            return renderer.bounds.center;
 
         return target.position;
     }
