@@ -1,52 +1,59 @@
 using System;
+using TMPro;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.UI;
 
-public class UI_HostStartButton : UI_Base, ILobbyWorldButtonInteractionTarget
+public class UI_RoleSelectButton : UI_Base, ILobbyWorldButtonInteractionTarget
 {
     private enum GameObjects
     {
-        StartButton,
+        RoleSelectButton,
     }
 
     private enum Buttons
     {
-        StartButton,
+        RoleSelectButton,
     }
 
     private enum Images
     {
-        StartButton,
+        RoleSelectButton,
+    }
+
+    private enum Texts
+    {
+        Nickname,
     }
 
     [SerializeField] private Renderer[] _outlineRenderers;
     [SerializeField] private float _outlineTriggerDistance = 3.5f;
     [SerializeField] private float _outlineWidth = 0.0125f;
-    [SerializeField] private Color _outlineColor = new Color(1f, 0.85f, 0.25f, 0.95f);
+    [SerializeField] private Color _outlineColor = new(1f, 0.85f, 0.25f, 0.95f);
     [SerializeField] private Color _uiNormalColor = Color.white;
-    [SerializeField] private Color _uiHighlightColor = new Color(1f, 0.95f, 0.55f, 1f);
+    [SerializeField] private Color _uiHighlightColor = new(1f, 0.95f, 0.55f, 1f);
     [SerializeField] private bool _pulseUiHighlight = true;
     [SerializeField] private float _uiPulseSpeed = 6f;
+    [SerializeField] private string _labelText = "Role";
 
     private GameObject _buttonRoot;
-    private Button _startButton;
+    private Button _button;
     private Image[] _uiHighlightImages;
-
+    private TextMeshProUGUI _label;
     private bool _isBound;
     private bool _isInitialized;
     private bool _outlineRegistered;
-    private bool _hostStateInitialized;
-    private bool _lastHostState;
     private bool _hasOutlineRenderers;
+    private bool _visibilityInitialized;
+    private bool _lastVisibleState;
     private bool _isInteractableByProximity;
     private float _currentProximitySqrDistance = float.PositiveInfinity;
 
-    public event Action StartButtonClicked;
+    public event Action RoleSelectButtonClicked;
 
     bool ILobbyWorldButtonInteractionTarget.IsProximityInteractable => _isInteractableByProximity;
     float ILobbyWorldButtonInteractionTarget.ProximitySqrDistance => _currentProximitySqrDistance;
-    int ILobbyWorldButtonInteractionTarget.InteractionPriority => 0;
+    int ILobbyWorldButtonInteractionTarget.InteractionPriority => 1;
 
     public override void Init()
     {
@@ -56,15 +63,20 @@ public class UI_HostStartButton : UI_Base, ILobbyWorldButtonInteractionTarget
         Bind<GameObject>(typeof(GameObjects));
         Bind<Button>(typeof(Buttons));
         Bind<Image>(typeof(Images));
+        Bind<TextMeshProUGUI>(typeof(Texts));
 
-        _buttonRoot = GetObject((int)GameObjects.StartButton);
-        _startButton = GetButton((int)Buttons.StartButton);
+        _buttonRoot = GetObject((int)GameObjects.RoleSelectButton);
+        _button = GetButton((int)Buttons.RoleSelectButton);
+        _label = GetText((int)Texts.Nickname);
 
         if (_buttonRoot == null)
-            _buttonRoot = FindButtonRoot();
+            _buttonRoot = gameObject;
 
-        if (_startButton == null && _buttonRoot != null)
-            _startButton = _buttonRoot.GetComponentInChildren<Button>(true);
+        if (_button == null)
+            _button = _buttonRoot.GetComponentInChildren<Button>(true);
+
+        if (_label == null)
+            _label = GetComponentInChildren<TextMeshProUGUI>(true);
 
         if (_outlineRenderers == null || _outlineRenderers.Length == 0)
             _outlineRenderers = GetComponentsInChildren<Renderer>(true);
@@ -73,14 +85,15 @@ public class UI_HostStartButton : UI_Base, ILobbyWorldButtonInteractionTarget
             ? _buttonRoot.GetComponentsInChildren<Image>(true)
             : GetComponentsInChildren<Image>(true);
 
+        if (_label != null)
+            _label.text = _labelText;
+
         BindButtonIfNeeded();
         RegisterOutlineTarget();
         LobbyWorldButtonInteractionRegistry.Register(this);
-
         SetOutlineVisible(false);
         SetUiHighlight(false);
         SetVisible(false);
-
         _isInitialized = true;
     }
 
@@ -98,7 +111,6 @@ public class UI_HostStartButton : UI_Base, ILobbyWorldButtonInteractionTarget
         _currentProximitySqrDistance = float.PositiveInfinity;
         SetOutlineVisible(false);
         SetUiHighlight(false);
-        SetVisible(false);
     }
 
     private void Update()
@@ -114,7 +126,7 @@ public class UI_HostStartButton : UI_Base, ILobbyWorldButtonInteractionTarget
     private void OnDestroy()
     {
         UnbindButton();
-        StartButtonClicked = null;
+        RoleSelectButtonClicked = null;
         LobbyWorldButtonInteractionRegistry.Unregister(this);
 
         if (_outlineRegistered && Managers.Outline != null)
@@ -123,11 +135,89 @@ public class UI_HostStartButton : UI_Base, ILobbyWorldButtonInteractionTarget
 
     private void BindButtonIfNeeded()
     {
-        if (_isBound || _startButton == null)
+        if (_isBound || _button == null)
             return;
 
-        _startButton.onClick.AddListener(NotifyStartButtonClicked);
+        _button.onClick.AddListener(NotifyRoleSelectButtonClicked);
         _isBound = true;
+    }
+
+    private void UnbindButton()
+    {
+        if (!_isBound || _button == null)
+            return;
+
+        _button.onClick.RemoveListener(NotifyRoleSelectButtonClicked);
+        _isBound = false;
+    }
+
+    private void NotifyRoleSelectButtonClicked()
+    {
+        RoleSelectButtonClicked?.Invoke();
+    }
+
+    private void RefreshVisibility(bool force)
+    {
+        bool isVisible = Managers.LobbySession != null && Managers.LobbySession.HasJoinedLobbySession;
+        if (!force && _visibilityInitialized && _lastVisibleState == isVisible)
+            return;
+
+        SetVisible(isVisible);
+        if (!isVisible)
+        {
+            _isInteractableByProximity = false;
+            _currentProximitySqrDistance = float.PositiveInfinity;
+            SetOutlineVisible(false);
+            SetUiHighlight(false);
+        }
+
+        _lastVisibleState = isVisible;
+        _visibilityInitialized = true;
+    }
+
+    private void RefreshProximityOutline()
+    {
+        if (Managers.LobbySession == null || !Managers.LobbySession.HasJoinedLobbySession)
+        {
+            _isInteractableByProximity = false;
+            _currentProximitySqrDistance = float.PositiveInfinity;
+            SetOutlineVisible(false);
+            SetUiHighlight(false);
+            return;
+        }
+
+        if (!Managers.LobbySession.TryGetLocalRangerTransform(out Transform rangerTransform) || rangerTransform == null)
+        {
+            _isInteractableByProximity = false;
+            _currentProximitySqrDistance = float.PositiveInfinity;
+            SetOutlineVisible(false);
+            SetUiHighlight(false);
+            return;
+        }
+
+        Vector3 targetPosition = _buttonRoot != null ? _buttonRoot.transform.position : transform.position;
+        float triggerDistance = Mathf.Max(0.1f, _outlineTriggerDistance);
+        float sqrDistance = (rangerTransform.position - targetPosition).sqrMagnitude;
+        bool shouldHighlight = sqrDistance <= triggerDistance * triggerDistance;
+        _isInteractableByProximity = shouldHighlight;
+        _currentProximitySqrDistance = shouldHighlight ? sqrDistance : float.PositiveInfinity;
+
+        SetOutlineVisible(shouldHighlight);
+        SetUiHighlight(shouldHighlight);
+    }
+
+    private void TryHandleDirectClick()
+    {
+        if (!_isInteractableByProximity)
+            return;
+
+        if (!LobbyWorldButtonInteractionRegistry.IsClosestAvailable(this))
+            return;
+
+        if (Mouse.current == null || !Mouse.current.leftButton.wasPressedThisFrame)
+            return;
+
+        NotifyRoleSelectButtonClicked();
     }
 
     private void RegisterOutlineTarget()
@@ -155,84 +245,6 @@ public class UI_HostStartButton : UI_Base, ILobbyWorldButtonInteractionTarget
         }
 
         return false;
-    }
-
-    private void UnbindButton()
-    {
-        if (!_isBound || _startButton == null)
-            return;
-
-        _startButton.onClick.RemoveListener(NotifyStartButtonClicked);
-        _isBound = false;
-    }
-
-    private void NotifyStartButtonClicked()
-    {
-        StartButtonClicked?.Invoke();
-    }
-
-    private void RefreshVisibility(bool force)
-    {
-        bool isHost = Managers.LobbySession != null && Managers.LobbySession.IsHosting;
-        if (!force && _hostStateInitialized && _lastHostState == isHost)
-            return;
-
-        SetVisible(isHost);
-        if (!isHost)
-        {
-            _isInteractableByProximity = false;
-            _currentProximitySqrDistance = float.PositiveInfinity;
-            SetOutlineVisible(false);
-            SetUiHighlight(false);
-        }
-
-        _lastHostState = isHost;
-        _hostStateInitialized = true;
-    }
-
-    private void RefreshProximityOutline()
-    {
-        if (Managers.LobbySession == null || !Managers.LobbySession.IsHosting)
-        {
-            _isInteractableByProximity = false;
-            _currentProximitySqrDistance = float.PositiveInfinity;
-            SetOutlineVisible(false);
-            SetUiHighlight(false);
-            return;
-        }
-
-        if (!Managers.LobbySession.TryGetLocalRangerTransform(out Transform rangerTransform) || rangerTransform == null)
-        {
-            _isInteractableByProximity = false;
-            _currentProximitySqrDistance = float.PositiveInfinity;
-            SetOutlineVisible(false);
-            SetUiHighlight(false);
-            return;
-        }
-
-        Vector3 targetPosition = _buttonRoot != null ? _buttonRoot.transform.position : transform.position;
-        float sqrDistance = (rangerTransform.position - targetPosition).sqrMagnitude;
-        float triggerDistance = Mathf.Max(0.1f, _outlineTriggerDistance);
-        bool shouldHighlight = sqrDistance <= triggerDistance * triggerDistance;
-        _isInteractableByProximity = shouldHighlight;
-        _currentProximitySqrDistance = shouldHighlight ? sqrDistance : float.PositiveInfinity;
-
-        SetOutlineVisible(shouldHighlight);
-        SetUiHighlight(shouldHighlight);
-    }
-
-    private void TryHandleDirectClick()
-    {
-        if (!_isInteractableByProximity)
-            return;
-
-        if (!LobbyWorldButtonInteractionRegistry.IsClosestAvailable(this))
-            return;
-
-        if (Mouse.current == null || !Mouse.current.leftButton.wasPressedThisFrame)
-            return;
-
-        NotifyStartButtonClicked();
     }
 
     private void SetOutlineVisible(bool visible)
@@ -280,21 +292,5 @@ public class UI_HostStartButton : UI_Base, ILobbyWorldButtonInteractionTarget
 
         if (_buttonRoot.activeSelf != visible)
             _buttonRoot.SetActive(visible);
-    }
-
-    private GameObject FindButtonRoot()
-    {
-        Transform byEnumName = transform.Find(nameof(GameObjects.StartButton));
-        if (byEnumName != null)
-            return byEnumName.gameObject;
-
-        Transform legacy = transform.Find("UI_HostStartButton");
-        if (legacy != null)
-            return legacy.gameObject;
-
-        if (transform.name == "UI_HostStartButton")
-            return gameObject;
-
-        return null;
     }
 }
