@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -11,8 +12,10 @@ public class LobbyScene : BaseScene
     private bool _isLobbySetupPending;
     private string _pendingJoinCode = string.Empty;
     private UI_HostStartButton _screenHostStartButton;
+    private Transform _screenTransform;
     private LobbyCameraController _localLobbyCamera;
     private const string LobbyCameraPrefabName = "Lobby_Camera";
+    private const string ScreenObjectName = "Screen";
 
     private readonly List<RoleButtonBinding> _roleButtonBindings = new();
     private static readonly RoleButtonSetup[] s_roleButtonSetups =
@@ -47,8 +50,8 @@ public class LobbyScene : BaseScene
 
     private sealed class RoleButtonBinding
     {
-        public Button Button;
-        public UnityEngine.Events.UnityAction Listener;
+        public UI_LobbyRoleButtonBase Button;
+        public Action<Define.TitanRole> Listener;
     }
 
     public static void RegisterUserObjects(string userId, RangerController ranger, UI_Nickname nickname)
@@ -147,8 +150,6 @@ public class LobbyScene : BaseScene
     {
         EnsureLocalLobbyCameraReady();
         UpdateLobbyLoadingState();
-        HandleLocalPartSelectionInput();
-
         if (!IsEscapePressedThisFrame())
             return;
 
@@ -289,19 +290,22 @@ public class LobbyScene : BaseScene
         if (_screenHostStartButton != null)
             return;
 
-        GameObject screen = GameObject.Find("Screen");
-        if (screen == null)
+        if (!TryGetScreenTransform(out Transform screenTransform))
         {
             Debug.LogWarning("[Lobby] Screen object was not found. Host start button setup skipped.");
             return;
         }
 
-        _screenHostStartButton = screen.GetComponent<UI_HostStartButton>();
+        Transform legacyRoot = screenTransform.Find("UI_HostStartButton");
+        _screenHostStartButton = Managers.UI.CreateWorldSpaceUI<UI_HostStartButton>(null, "UI_HostStartButton");
         if (_screenHostStartButton == null)
         {
-            Debug.LogWarning("[Lobby] UI_HostStartButton is missing on Screen. Attach it in scene and keep button root hidden by default.");
+            Debug.LogWarning("[Lobby] Failed to load UI_HostStartButton prefab from Resources/Prefabs/UIs/WorldSpace.");
             return;
         }
+
+        ApplyLegacyTransform(_screenHostStartButton.transform, legacyRoot);
+        SetLegacyButtonHidden(legacyRoot);
 
         _screenHostStartButton.StartButtonClicked -= HandleHostStartButtonClicked;
         _screenHostStartButton.StartButtonClicked += HandleHostStartButtonClicked;
@@ -312,8 +316,7 @@ public class LobbyScene : BaseScene
         if (_roleButtonBindings.Count > 0)
             return;
 
-        GameObject screen = GameObject.Find("Screen");
-        if (screen == null)
+        if (!TryGetScreenTransform(out Transform screenTransform))
         {
             Debug.LogWarning("[Lobby] Screen object was not found. Role button setup skipped.");
             return;
@@ -322,23 +325,22 @@ public class LobbyScene : BaseScene
         for (int i = 0; i < s_roleButtonSetups.Length; i++)
         {
             RoleButtonSetup setup = s_roleButtonSetups[i];
-            Transform root = screen.transform.Find(setup.ObjectName);
-            if (root == null)
-            {
-                Debug.LogWarning($"[Lobby] {setup.ObjectName} object was not found under Screen.");
-                continue;
-            }
+            Transform legacyRoot = screenTransform.Find(setup.ObjectName);
 
-            Button roleButton = root.GetComponentInChildren<Button>(true);
+            UI_LobbyRoleButtonBase roleButton = CreateRoleButton(setup);
             if (roleButton == null)
             {
-                Debug.LogWarning($"[Lobby] {setup.ObjectName} has no Button component in children.");
+                Debug.LogWarning($"[Lobby] Failed to load {setup.ObjectName} prefab from Resources/Prefabs/UIs/WorldSpace.");
                 continue;
             }
 
-            Define.TitanRole role = setup.Role;
-            UnityEngine.Events.UnityAction listener = () => HandleRoleButtonClicked(role);
-            roleButton.onClick.AddListener(listener);
+            roleButton.SetLabel(GetRoleLabel(setup.Role));
+            ApplyLegacyTransform(roleButton.transform, legacyRoot);
+            SetLegacyButtonHidden(legacyRoot);
+
+            Action<Define.TitanRole> listener = HandleRoleButtonClicked;
+            roleButton.RoleButtonClicked -= listener;
+            roleButton.RoleButtonClicked += listener;
 
             _roleButtonBindings.Add(new RoleButtonBinding
             {
@@ -353,13 +355,76 @@ public class LobbyScene : BaseScene
         for (int i = 0; i < _roleButtonBindings.Count; i++)
         {
             RoleButtonBinding binding = _roleButtonBindings[i];
-            if (binding.Button == null || binding.Listener == null)
-                continue;
-
-            binding.Button.onClick.RemoveListener(binding.Listener);
+            if (binding.Button != null && binding.Listener != null)
+            {
+                binding.Button.RoleButtonClicked -= binding.Listener;
+                Managers.Resource.Destory(binding.Button.gameObject);
+            }
         }
 
         _roleButtonBindings.Clear();
+    }
+
+    private static UI_LobbyRoleButtonBase CreateRoleButton(RoleButtonSetup setup)
+    {
+        return setup.Role switch
+        {
+            Define.TitanRole.Body => Managers.UI.CreateWorldSpaceUI<UI_BodyButton>(null, setup.ObjectName),
+            Define.TitanRole.LeftArm => Managers.UI.CreateWorldSpaceUI<UI_LeftArmButton>(null, setup.ObjectName),
+            Define.TitanRole.RightArm => Managers.UI.CreateWorldSpaceUI<UI_RightArmButton>(null, setup.ObjectName),
+            Define.TitanRole.LeftLeg => Managers.UI.CreateWorldSpaceUI<UI_LeftLegButton>(null, setup.ObjectName),
+            Define.TitanRole.RightLeg => Managers.UI.CreateWorldSpaceUI<UI_RightLegButton>(null, setup.ObjectName),
+            _ => null,
+        };
+    }
+
+    private bool TryGetScreenTransform(out Transform screenTransform)
+    {
+        if (_screenTransform != null)
+        {
+            screenTransform = _screenTransform;
+            return true;
+        }
+
+        GameObject screen = GameObject.Find(ScreenObjectName);
+        if (screen == null)
+        {
+            screenTransform = null;
+            return false;
+        }
+
+        UI_HostStartButton legacyHostButtonController = screen.GetComponent<UI_HostStartButton>();
+        if (legacyHostButtonController != null)
+            legacyHostButtonController.enabled = false;
+
+        _screenTransform = screen.transform;
+        screenTransform = _screenTransform;
+        return true;
+    }
+
+    private static void ApplyLegacyTransform(Transform targetTransform, Transform legacyTransform)
+    {
+        if (targetTransform == null || legacyTransform == null)
+            return;
+
+        targetTransform.SetPositionAndRotation(legacyTransform.position, legacyTransform.rotation);
+        targetTransform.localScale = legacyTransform.lossyScale;
+
+        if (targetTransform is RectTransform targetRect && legacyTransform is RectTransform legacyRect)
+        {
+            targetRect.sizeDelta = legacyRect.sizeDelta;
+            targetRect.pivot = legacyRect.pivot;
+        }
+    }
+
+
+    private static void SetLegacyButtonHidden(Transform legacyTransform)
+    {
+        if (legacyTransform == null)
+            return;
+
+        if (legacyTransform.gameObject.activeSelf)
+            legacyTransform.gameObject.SetActive(false);
     }
 
     private void HandleRoleButtonClicked(Define.TitanRole role)
@@ -391,7 +456,7 @@ public class LobbyScene : BaseScene
             return;
 
         if (_localLobbyCamera == null)
-            _localLobbyCamera = Object.FindAnyObjectByType<LobbyCameraController>();
+            _localLobbyCamera = FindAnyObjectByType<LobbyCameraController>();
 
         if (!Managers.LobbySession.TryGetLocalRangerTransform(out Transform localRanger) || localRanger == null)
             return;
@@ -421,62 +486,9 @@ public class LobbyScene : BaseScene
         return true;
     }
 
-    private void HandleLocalPartSelectionInput()
-    {
-        if (_isLobbySetupPending || !Managers.LobbySession.HasJoinedLobbySession)
-            return;
-
-        if (Managers.Input.Mode != Define.InputMode.Player)
-            return;
-
-        if (!TryReadRoleSelectionInput(out Define.TitanRole selectedRole))
-            return;
-
-        TrySelectLocalRole(selectedRole);
-    }
-
-    private static bool TryReadRoleSelectionInput(out Define.TitanRole selectedRole)
-    {
-        selectedRole = Define.TitanRole.Body;
-        if (Keyboard.current == null)
-            return false;
-
-        if (Keyboard.current.digit1Key.wasPressedThisFrame || Keyboard.current.numpad1Key.wasPressedThisFrame)
-        {
-            selectedRole = Define.TitanRole.Body;
-            return true;
-        }
-
-        if (Keyboard.current.digit2Key.wasPressedThisFrame || Keyboard.current.numpad2Key.wasPressedThisFrame)
-        {
-            selectedRole = Define.TitanRole.LeftArm;
-            return true;
-        }
-
-        if (Keyboard.current.digit3Key.wasPressedThisFrame || Keyboard.current.numpad3Key.wasPressedThisFrame)
-        {
-            selectedRole = Define.TitanRole.RightArm;
-            return true;
-        }
-
-        if (Keyboard.current.digit4Key.wasPressedThisFrame || Keyboard.current.numpad4Key.wasPressedThisFrame)
-        {
-            selectedRole = Define.TitanRole.LeftLeg;
-            return true;
-        }
-
-        if (Keyboard.current.digit5Key.wasPressedThisFrame || Keyboard.current.numpad5Key.wasPressedThisFrame)
-        {
-            selectedRole = Define.TitanRole.RightLeg;
-            return true;
-        }
-
-        return false;
-    }
-
     private static LobbyNetworkPlayer FindLocalOwnedNetworkPlayer()
     {
-        LobbyNetworkPlayer[] players = Object.FindObjectsByType<LobbyNetworkPlayer>();
+        LobbyNetworkPlayer[] players = FindObjectsByType<LobbyNetworkPlayer>();
         for (int i = 0; i < players.Length; i++)
         {
             LobbyNetworkPlayer player = players[i];
@@ -645,11 +657,15 @@ public class LobbyScene : BaseScene
         }
 
         if (_screenHostStartButton != null)
+        {
             _screenHostStartButton.StartButtonClicked -= HandleHostStartButtonClicked;
+            Managers.Resource.Destory(_screenHostStartButton.gameObject);
+        }
 
         UnbindScreenRoleButtons();
 
         _localLobbyCamera = null;
         _screenHostStartButton = null;
+        _screenTransform = null;
     }
 }

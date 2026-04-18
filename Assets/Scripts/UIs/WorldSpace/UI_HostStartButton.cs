@@ -2,40 +2,85 @@ using System;
 using UnityEngine;
 using UnityEngine.UI;
 
-public class UI_HostStartButton : MonoBehaviour
+public class UI_HostStartButton : UI_Base
 {
-    [SerializeField] private GameObject _buttonRoot;
-    [SerializeField] private Button _startButton;
+    private enum GameObjects
+    {
+        StartButton,
+    }
+
+    private enum Buttons
+    {
+        StartButton,
+    }
+
+    private enum Images
+    {
+        StartButton,
+    }
+
     [SerializeField] private Renderer[] _outlineRenderers;
     [SerializeField] private float _outlineTriggerDistance = 3.5f;
     [SerializeField] private float _outlineWidth = 0.0125f;
     [SerializeField] private Color _outlineColor = new Color(1f, 0.85f, 0.25f, 0.95f);
-    [SerializeField] private Image[] _uiHighlightImages;
     [SerializeField] private Color _uiNormalColor = Color.white;
     [SerializeField] private Color _uiHighlightColor = new Color(1f, 0.95f, 0.55f, 1f);
     [SerializeField] private bool _pulseUiHighlight = true;
     [SerializeField] private float _uiPulseSpeed = 6f;
 
+    private GameObject _buttonRoot;
+    private Button _startButton;
+    private Image[] _uiHighlightImages;
+
     private bool _isBound;
+    private bool _isInitialized;
+    private bool _outlineRegistered;
     private bool _hostStateInitialized;
     private bool _lastHostState;
     private bool _hasOutlineRenderers;
 
     public event Action StartButtonClicked;
 
-    private void Awake()
+    public override void Init()
     {
-        ResolveReferences();
+        if (_isInitialized)
+            return;
+
+        Bind<GameObject>(typeof(GameObjects));
+        Bind<Button>(typeof(Buttons));
+        Bind<Image>(typeof(Images));
+
+        _buttonRoot = GetObject((int)GameObjects.StartButton);
+        _startButton = GetButton((int)Buttons.StartButton);
+
+        if (_buttonRoot == null)
+            _buttonRoot = FindButtonRoot();
+
+        if (_startButton == null && _buttonRoot != null)
+            _startButton = _buttonRoot.GetComponentInChildren<Button>(true);
+
+        if (_outlineRenderers == null || _outlineRenderers.Length == 0)
+            _outlineRenderers = GetComponentsInChildren<Renderer>(true);
+
+        _uiHighlightImages = _buttonRoot != null
+            ? _buttonRoot.GetComponentsInChildren<Image>(true)
+            : GetComponentsInChildren<Image>(true);
+
+        BindButtonIfNeeded();
         RegisterOutlineTarget();
+
         SetOutlineVisible(false);
         SetUiHighlight(false);
         SetVisible(false);
+
+        _isInitialized = true;
     }
 
     private void OnEnable()
     {
-        ResolveReferences();
-        RegisterOutlineTarget();
+        if (!_isInitialized)
+            Init();
+
         RefreshVisibility(true);
     }
 
@@ -48,6 +93,9 @@ public class UI_HostStartButton : MonoBehaviour
 
     private void Update()
     {
+        if (!_isInitialized)
+            return;
+
         RefreshVisibility(false);
         RefreshProximityOutline();
     }
@@ -57,43 +105,30 @@ public class UI_HostStartButton : MonoBehaviour
         UnbindButton();
         StartButtonClicked = null;
 
-        if (Managers.Outline != null)
+        if (_outlineRegistered && Managers.Outline != null)
             Managers.Outline.UnregisterTarget(this);
     }
 
-    private void ResolveReferences()
+    private void BindButtonIfNeeded()
     {
-        if (_buttonRoot == null)
-            _buttonRoot = FindButtonRoot();
+        if (_isBound || _startButton == null)
+            return;
 
-        if (_startButton == null)
-            _startButton = FindStartButton();
-
-        if (_outlineRenderers == null || _outlineRenderers.Length == 0)
-            _outlineRenderers = GetComponentsInChildren<Renderer>(true);
-
-        if (_uiHighlightImages == null || _uiHighlightImages.Length == 0)
-        {
-            if (_buttonRoot != null)
-                _uiHighlightImages = _buttonRoot.GetComponentsInChildren<Image>(true);
-            else
-                _uiHighlightImages = GetComponentsInChildren<Image>(true);
-        }
-
-        if (!_isBound && _startButton != null)
-        {
-            _startButton.onClick.AddListener(NotifyStartButtonClicked);
-            _isBound = true;
-        }
+        _startButton.onClick.AddListener(NotifyStartButtonClicked);
+        _isBound = true;
     }
 
     private void RegisterOutlineTarget()
     {
+        if (_outlineRegistered)
+            return;
+
         _hasOutlineRenderers = HasAnyRenderer(_outlineRenderers);
         if (!_hasOutlineRenderers)
             return;
 
         Managers.Outline.RegisterTarget(this, _outlineRenderers, _outlineColor, _outlineWidth, false);
+        _outlineRegistered = true;
     }
 
     private static bool HasAnyRenderer(Renderer[] renderers)
@@ -215,34 +250,17 @@ public class UI_HostStartButton : MonoBehaviour
 
     private GameObject FindButtonRoot()
     {
-        Transform byUiName = transform.Find("UI_HostStartButton");
-        if (byUiName != null)
-            return byUiName.gameObject;
+        Transform byEnumName = transform.Find(nameof(GameObjects.StartButton));
+        if (byEnumName != null)
+            return byEnumName.gameObject;
 
-        Transform legacy = transform.Find("HostStartButton");
+        Transform legacy = transform.Find("UI_HostStartButton");
         if (legacy != null)
             return legacy.gameObject;
 
         if (transform.name == "UI_HostStartButton")
             return gameObject;
 
-        Debug.LogWarning("[Lobby] UI_HostStartButton object is not assigned. Set _buttonRoot in inspector.");
         return null;
-    }
-
-    private Button FindStartButton()
-    {
-        if (_buttonRoot == null)
-            return null;
-
-        Transform startButtonRoot = _buttonRoot.transform.Find("StartButton");
-        if (startButtonRoot != null)
-        {
-            Button direct = startButtonRoot.GetComponent<Button>();
-            if (direct != null)
-                return direct;
-        }
-
-        return _buttonRoot.GetComponentInChildren<Button>(true);
     }
 }
