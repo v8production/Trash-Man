@@ -35,6 +35,9 @@ public class LobbySessionManager
     private ulong _currentDiscordLobbyId;
     private float _nextLobbyStateSyncTime;
     private bool _isUpdatingHostMetadata;
+    private string _activeClientHostAddress = string.Empty;
+    private ushort _activeClientPort;
+
 
     private static bool s_loggedNetcodeMissing;
     private static bool s_loggedNetworkManagerMissing;
@@ -91,6 +94,7 @@ public class LobbySessionManager
         _currentDiscordLobbyId = 0;
         _nextLobbyStateSyncTime = 0f;
         _isUpdatingHostMetadata = false;
+        ResetClientConnectionTracking();
     }
 
     public static string NormalizeJoinCode(string value)
@@ -222,6 +226,7 @@ public class LobbySessionManager
         _currentDiscordLobbyId = 0;
         _nextLobbyStateSyncTime = 0f;
         _isUpdatingHostMetadata = false;
+        ResetClientConnectionTracking();
     }
 
     public void SetRangerNicknameVoiceActive(string userId, bool isVoiceChatActive)
@@ -340,12 +345,19 @@ public class LobbySessionManager
 
         IsHosting = requestedAsHost || string.Equals(HostUserId, Managers.Discord.LocalUserId, StringComparison.Ordinal);
 
-        if (!IsHosting && !TryStartUtpClient(_currentHostAddress, _currentPort))
+        if (!IsHosting)
         {
-            Debug.LogWarning($"[Lobby] Failed to start UTP client. host={_currentHostAddress}, port={_currentPort}");
-            Managers.Toast.EnqueueMessage("Failed to connect to lobby host.", 2.5f);
-            Managers.Scene.LoadScene(Define.Scene.Intro);
-            return;
+            if (_currentPort == 0 || string.IsNullOrWhiteSpace(_currentHostAddress))
+            {
+                Debug.LogWarning("[Lobby] Waiting for host endpoint metadata before starting UTP client.");
+            }
+            else if (!TryStartUtpClient(_currentHostAddress, _currentPort))
+            {
+                Debug.LogWarning($"[Lobby] Failed to start UTP client. host={_currentHostAddress}, port={_currentPort}");
+                Managers.Toast.EnqueueMessage("Failed to connect to lobby host.", 2.5f);
+                Managers.Scene.LoadScene(Define.Scene.Intro);
+                return;
+            }
         }
 
         Managers.Discord.NotifyLobbyUserJoined(Managers.Discord.LocalUserId, Managers.Discord.LocalDisplayName, true);
@@ -599,6 +611,7 @@ public class LobbySessionManager
                 {
                     IsHosting = true;
                     _currentHostAddress = hostAddress;
+                    ResetClientConnectionTracking();
                     Debug.Log($"[Lobby] Host promoted via Discord metadata. joinCode={CurrentJoinCode}, host={HostUserId}");
                 }
             }
@@ -611,6 +624,9 @@ public class LobbySessionManager
             TryStopUtp();
             IsHosting = false;
         }
+
+        if (_currentPort == 0 || string.IsNullOrWhiteSpace(_currentHostAddress))
+            return;
 
         TryStartUtpClient(_currentHostAddress, _currentPort);
     }
@@ -697,6 +713,7 @@ public class LobbySessionManager
                 if (networkManager.IsServer)
                 {
                     hostAddress = ResolveConfiguredHostAddress();
+                    ResetClientConnectionTracking();
                     return true;
                 }
 
@@ -710,9 +727,11 @@ public class LobbySessionManager
             if (!started)
             {
                 Debug.LogWarning($"UTP host start returned false. isListening={networkManager.IsListening}, isServer={networkManager.IsServer}, isClient={networkManager.IsClient}, port={port}");
+                return false;
             }
 
-            return started;
+            ResetClientConnectionTracking();
+            return true;
         }
         catch (Exception e)
         {
@@ -723,27 +742,49 @@ public class LobbySessionManager
 
     private bool TryStartUtpClient(string hostAddress, ushort port)
     {
+        string targetHost = NormalizeHostAddress(hostAddress);
+        if (port == 0 || string.IsNullOrWhiteSpace(targetHost))
+        {
+            Debug.LogWarning($"[Lobby] StartClient skipped: invalid endpoint host={targetHost}, port={port}");
+            return false;
+        }
+
         try
         {
             if (!TryResolveNetworkObjects(out NetworkManager networkManager, out UnityTransport utpTransport))
                 return false;
 
+            bool sameEndpoint = string.Equals(_activeClientHostAddress, targetHost, StringComparison.OrdinalIgnoreCase)
+                && _activeClientPort == port;
+
             if (networkManager.IsListening)
             {
                 if (networkManager.IsClient && !networkManager.IsServer)
                 {
-                    Debug.Log($"[Lobby] StartClient skipped: already connected. host={hostAddress}, port={port}");
-                    return true;
-                }
+                    if (sameEndpoint)
+                    {
+                        Debug.Log($"[Lobby] StartClient skipped: already using host={targetHost}, port={port}");
+                        return true;
+                    }
 
-                networkManager.Shutdown();
+                    networkManager.Shutdown();
+                }
+                else
+                {
+                    networkManager.Shutdown();
+                }
             }
 
-            ConfigureTransportConnection(utpTransport, hostAddress, port);
+            ConfigureTransportConnection(utpTransport, targetHost, port);
 
             bool started = networkManager.StartClient();
-            Debug.Log($"[Lobby] StartClient requested. host={hostAddress}, port={port}, started={started}");
-            return started;
+            Debug.Log($"[Lobby] StartClient requested. host={targetHost}, port={port}, started={started}");
+            if (!started)
+                return false;
+
+            _activeClientHostAddress = targetHost;
+            _activeClientPort = port;
+            return true;
         }
         catch (Exception e)
         {
@@ -760,9 +801,13 @@ public class LobbySessionManager
                 return false;
 
             if (!networkManager.IsListening)
+            {
+                ResetClientConnectionTracking();
                 return true;
+            }
 
             networkManager.Shutdown();
+            ResetClientConnectionTracking();
             return true;
         }
         catch (Exception e)
@@ -770,6 +815,17 @@ public class LobbySessionManager
             Debug.LogWarning($"UTP stop failed: {e.Message}");
             return false;
         }
+    }
+
+    private static string NormalizeHostAddress(string hostAddress)
+    {
+        return string.IsNullOrWhiteSpace(hostAddress) ? DefaultHostAddress : hostAddress.Trim();
+    }
+
+    private void ResetClientConnectionTracking()
+    {
+        _activeClientHostAddress = string.Empty;
+        _activeClientPort = 0;
     }
 
     private static bool TryResolveNetworkObjects(out NetworkManager networkManager, out UnityTransport utpTransport)
