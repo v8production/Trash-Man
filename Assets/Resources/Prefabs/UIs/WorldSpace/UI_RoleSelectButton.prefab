@@ -361,11 +361,3 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 2744789543}
   m_CullTransparentMesh: 1
-*** Add File: /Users/chulhwankim/Projects/Unity/trash-man/Assets/Resources/Prefabs/UIs/WorldSpace/UI_RoleSelectButton.prefab.meta
-fileFormatVersion: 2
-guid: 90ab9ff04b7548fe90910db45f9cb6c3
-PrefabImporter:
-  externalObjects: {}
-  userData: 
-  assetBundleName: 
-  assetBundleVariant: 

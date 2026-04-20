@@ -23,6 +23,7 @@ public class LobbyNetworkPlayer : NetworkBehaviour
     public int SelectedTitanRoleValue => _selectedTitanRole.Value;
     public bool HasSelectedTitanRole => IsValidTitanRoleValue(_selectedTitanRole.Value);
     public TitanRoleInputPayload CurrentRoleInput => _roleInput.Value;
+    public string DisplayName => GetDisplayName();
 
     private void Awake()
     {

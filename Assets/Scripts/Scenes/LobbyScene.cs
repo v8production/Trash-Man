@@ -307,6 +307,7 @@ public class LobbyScene : BaseScene
 
         SetLegacyButtonHidden(legacyRoot);
         ApplyScreenButtonTransform(_screenHostStartButton.transform, s_hostStartButtonPlacement, screenTransform);
+        _screenHostStartButton.transform.SetParent(null, true);
 
         _screenHostStartButton.StartButtonClicked -= HandleHostStartButtonClicked;
         _screenHostStartButton.StartButtonClicked += HandleHostStartButtonClicked;
@@ -333,6 +334,7 @@ public class LobbyScene : BaseScene
 
         SetLegacyButtonHidden(legacyRoot);
         ApplyScreenButtonTransform(_screenRoleSelectButton.transform, s_roleSelectButtonPlacement, screenTransform);
+        _screenRoleSelectButton.transform.SetParent(null, true);
 
         _screenRoleSelectButton.RoleSelectButtonClicked -= HandleRoleSelectButtonClicked;
         _screenRoleSelectButton.RoleSelectButtonClicked += HandleRoleSelectButtonClicked;
@@ -419,8 +421,8 @@ public class LobbyScene : BaseScene
         if (_isLobbySetupPending || !Managers.LobbySession.HasJoinedLobbySession)
             return;
 
-        if (TrySelectLocalRole(role))
-            CloseRoleSelectMenu();
+        if (TrySelectLocalRole(role) && _roleSelectMenu != null)
+            _roleSelectMenu.RefreshRoleNicknames();
     }
 
     private void HandleRoleSelectMenuClosed()
@@ -466,6 +468,7 @@ public class LobbyScene : BaseScene
             return;
 
         _roleSelectMenu.gameObject.SetActive(true);
+        _roleSelectMenu.RefreshRoleNicknames();
         Managers.Input.SetMode(Define.InputMode.UI);
     }
 
