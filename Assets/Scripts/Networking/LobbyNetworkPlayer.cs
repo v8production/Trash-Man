@@ -9,10 +9,12 @@ using UnityEngine.SceneManagement;
 public class LobbyNetworkPlayer : NetworkBehaviour
 {
     private const string LobbyCameraPrefabName = "Lobby_Camera";
+    private const int FirstTitanRoleValue = (int)Define.TitanRole.Body;
+    private const int LastTitanRoleValue = (int)Define.TitanRole.RightLeg;
 
     private readonly NetworkVariable<FixedString64Bytes> _discordUserId = new(default);
     private readonly NetworkVariable<FixedString64Bytes> _displayName = new(new FixedString64Bytes("Player"));
-    private readonly NetworkVariable<int> _selectedTitanRole = new(0);
+    private readonly NetworkVariable<int> _selectedTitanRoleMask = new(0);
     private readonly NetworkVariable<TitanRoleInputPayload> _roleInput = new(default, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
 
     private RangerController _rangerController;
@@ -20,8 +22,8 @@ public class LobbyNetworkPlayer : NetworkBehaviour
     private UI_Nickname _nicknameUI;
     private LobbyCameraController _localCamera;
 
-    public int SelectedTitanRoleValue => _selectedTitanRole.Value;
-    public bool HasSelectedTitanRole => IsValidTitanRoleValue(_selectedTitanRole.Value);
+    public int SelectedTitanRoleMaskValue => NormalizeTitanRoleMask(_selectedTitanRoleMask.Value);
+    public bool HasSelectedTitanRole => NormalizeTitanRoleMask(_selectedTitanRoleMask.Value) != 0;
     public TitanRoleInputPayload CurrentRoleInput => _roleInput.Value;
     public string DisplayName => GetDisplayName();
 
@@ -38,7 +40,7 @@ public class LobbyNetworkPlayer : NetworkBehaviour
         EnsureVisualComponentsEnabled();
         _discordUserId.OnValueChanged += HandleIdentityChanged;
         _displayName.OnValueChanged += HandleIdentityChanged;
-        _selectedTitanRole.OnValueChanged += HandleSelectedRoleChanged;
+        _selectedTitanRoleMask.OnValueChanged += HandleSelectedRoleChanged;
 
         ApplyOwnershipState();
         EnsureNicknameUI();
@@ -56,7 +58,7 @@ public class LobbyNetworkPlayer : NetworkBehaviour
     {
         _discordUserId.OnValueChanged -= HandleIdentityChanged;
         _displayName.OnValueChanged -= HandleIdentityChanged;
-        _selectedTitanRole.OnValueChanged -= HandleSelectedRoleChanged;
+        _selectedTitanRoleMask.OnValueChanged -= HandleSelectedRoleChanged;
 
         string lobbyUserId = GetLobbyUserId();
         if (!string.IsNullOrWhiteSpace(lobbyUserId))
@@ -82,9 +84,9 @@ public class LobbyNetworkPlayer : NetworkBehaviour
     }
 
     [Rpc(SendTo.Server, InvokePermission = RpcInvokePermission.Owner)]
-    private void SubmitSelectedTitanRoleServerRpc(int titanRoleValue)
+    private void SubmitSelectedTitanRoleMaskServerRpc(int titanRoleMask)
     {
-        _selectedTitanRole.Value = NormalizeTitanRoleValue(titanRoleValue);
+        _selectedTitanRoleMask.Value = NormalizeTitanRoleMask(titanRoleMask);
     }
 
     [Rpc(SendTo.Server, InvokePermission = RpcInvokePermission.Owner)]
@@ -108,23 +110,44 @@ public class LobbyNetworkPlayer : NetworkBehaviour
     public bool TryGetSelectedRole(out Define.TitanRole role)
     {
         role = Define.TitanRole.Body;
-        if (!IsValidTitanRoleValue(_selectedTitanRole.Value))
+        int mask = NormalizeTitanRoleMask(_selectedTitanRoleMask.Value);
+        if (mask == 0)
             return false;
 
-        role = (Define.TitanRole)_selectedTitanRole.Value;
+        role = GetFirstRoleFromMask(mask);
         return true;
     }
 
-    public void SelectTitanRole(Define.TitanRole titanRole)
+    public bool TryGetSelectedRoleMask(out int roleMask)
+    {
+        roleMask = NormalizeTitanRoleMask(_selectedTitanRoleMask.Value);
+        return roleMask != 0;
+    }
+
+    public bool HasSelectedTitanRoleValue(Define.TitanRole titanRole)
+    {
+        int bit = RoleToMaskBit(titanRole);
+        if (bit == 0)
+            return false;
+
+        return (NormalizeTitanRoleMask(_selectedTitanRoleMask.Value) & bit) != 0;
+    }
+
+    public void ToggleTitanRoleSelection(Define.TitanRole titanRole)
     {
         if (!IsOwner)
             return;
 
-        int roleValue = NormalizeTitanRoleValue((int)titanRole);
-        if (_selectedTitanRole.Value == roleValue)
+        int bit = RoleToMaskBit(titanRole);
+        if (bit == 0)
             return;
 
-        SubmitSelectedTitanRoleServerRpc(roleValue);
+        int currentMask = NormalizeTitanRoleMask(_selectedTitanRoleMask.Value);
+        int nextMask = NormalizeTitanRoleMask(currentMask ^ bit);
+        if (nextMask == currentMask)
+            return;
+
+        SubmitSelectedTitanRoleMaskServerRpc(nextMask);
     }
 
     public void PublishLocalRoleInput()
@@ -271,7 +294,7 @@ public class LobbyNetworkPlayer : NetworkBehaviour
         if (string.IsNullOrWhiteSpace(lobbyUserId))
             return;
 
-        LobbyScene.RegisterUserPartSelection(lobbyUserId, _selectedTitanRole.Value);
+        LobbyScene.RegisterUserPartSelection(lobbyUserId, NormalizeTitanRoleMask(_selectedTitanRoleMask.Value));
     }
 
     private string GetLobbyUserId()
@@ -303,8 +326,41 @@ public class LobbyNetworkPlayer : NetworkBehaviour
         return IsValidTitanRoleValue(roleValue) ? roleValue : 0;
     }
 
+    private static int NormalizeTitanRoleMask(int roleMask)
+    {
+        return roleMask & GetAllTitanRoleMask();
+    }
+
+    private static int GetAllTitanRoleMask()
+    {
+        int count = (LastTitanRoleValue - FirstTitanRoleValue) + 1;
+        return (1 << count) - 1;
+    }
+
+    private static int RoleToMaskBit(Define.TitanRole role)
+    {
+        int roleValue = (int)role;
+        if (!IsValidTitanRoleValue(roleValue))
+            return 0;
+
+        return 1 << (roleValue - FirstTitanRoleValue);
+    }
+
+    private static Define.TitanRole GetFirstRoleFromMask(int roleMask)
+    {
+        int normalized = NormalizeTitanRoleMask(roleMask);
+        for (int roleValue = FirstTitanRoleValue; roleValue <= LastTitanRoleValue; roleValue++)
+        {
+            int bit = 1 << (roleValue - FirstTitanRoleValue);
+            if ((normalized & bit) != 0)
+                return (Define.TitanRole)roleValue;
+        }
+
+        return Define.TitanRole.Body;
+    }
+
     private static bool IsValidTitanRoleValue(int roleValue)
     {
-        return roleValue >= (int)Define.TitanRole.Body && roleValue <= (int)Define.TitanRole.RightLeg;
+        return roleValue >= FirstTitanRoleValue && roleValue <= LastTitanRoleValue;
     }
 }

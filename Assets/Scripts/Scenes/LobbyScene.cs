@@ -29,7 +29,7 @@ public class LobbyScene : BaseScene
     {
         public RangerController Ranger;
         public UI_Nickname Nickname;
-        public int SelectedRole;
+        public int SelectedRoleMask;
     }
 
     private readonly struct ScreenButtonPlacement
@@ -62,7 +62,7 @@ public class LobbyScene : BaseScene
             entry.Nickname = nickname;
     }
 
-    public static void RegisterUserPartSelection(string userId, int selectedRoleValue)
+    public static void RegisterUserPartSelection(string userId, int selectedRoleMask)
     {
         if (string.IsNullOrWhiteSpace(userId))
             return;
@@ -73,7 +73,21 @@ public class LobbyScene : BaseScene
             s_userEntriesByDiscordUserId[userId] = entry;
         }
 
-        entry.SelectedRole = NormalizeRoleValue(selectedRoleValue);
+        entry.SelectedRoleMask = NormalizeRoleMask(selectedRoleMask);
+    }
+
+    public static bool TryGetRegisteredUserSelectedRoleMask(string userId, out int roleMask)
+    {
+        roleMask = 0;
+
+        if (string.IsNullOrWhiteSpace(userId))
+            return false;
+
+        if (!s_userEntriesByDiscordUserId.TryGetValue(userId, out LobbyUserEntry entry) || entry == null)
+            return false;
+
+        roleMask = NormalizeRoleMask(entry.SelectedRoleMask);
+        return roleMask != 0;
     }
 
     public static void UnregisterUserObjects(string userId, RangerController ranger, UI_Nickname nickname)
@@ -421,7 +435,7 @@ public class LobbyScene : BaseScene
         if (_isLobbySetupPending || !Managers.LobbySession.HasJoinedLobbySession)
             return;
 
-        if (TrySelectLocalRole(role) && _roleSelectMenu != null)
+        if (TryToggleLocalRole(role) && _roleSelectMenu != null)
             _roleSelectMenu.RefreshRoleNicknames();
     }
 
@@ -430,18 +444,23 @@ public class LobbyScene : BaseScene
         CloseRoleSelectMenu();
     }
 
-    private bool TrySelectLocalRole(Define.TitanRole selectedRole)
+    private bool TryToggleLocalRole(Define.TitanRole selectedRole)
     {
         LobbyNetworkPlayer localPlayer = FindLocalOwnedNetworkPlayer();
         if (localPlayer == null)
             return false;
 
-        localPlayer.SelectTitanRole(selectedRole);
+        int currentMask = localPlayer.SelectedTitanRoleMaskValue;
+        int bit = 1 << (((int)selectedRole) - (int)Define.TitanRole.Body);
+        int nextMask = currentMask ^ bit;
+
+        localPlayer.ToggleTitanRoleSelection(selectedRole);
 
         if (localPlayer.TryGetLobbyUserId(out string lobbyUserId))
-            RegisterUserPartSelection(lobbyUserId, (int)selectedRole);
+            RegisterUserPartSelection(lobbyUserId, nextMask);
 
-        Managers.Toast.EnqueueMessage($"Selected part: {GetRoleLabel(selectedRole)}", 1.4f);
+        bool isSelected = (nextMask & bit) != 0;
+        Managers.Toast.EnqueueMessage($"{(isSelected ? "Selected" : "Unselected")} part: {GetRoleLabel(selectedRole)}", 1.4f);
         return true;
     }
 
@@ -559,7 +578,8 @@ public class LobbyScene : BaseScene
             return false;
         }
 
-        HashSet<int> claimedRoles = new();
+        Dictionary<int, string> ownerByRoleValue = new();
+        int combinedRoleMask = 0;
 
         foreach (KeyValuePair<string, LobbyUserEntry> pair in s_userEntriesByDiscordUserId)
         {
@@ -571,22 +591,29 @@ public class LobbyScene : BaseScene
                 return false;
             }
 
-            if (!IsValidRoleValue(entry.SelectedRole))
-            {
-                missingUserId = userId;
-                return false;
-            }
+            int roleMask = NormalizeRoleMask(entry.SelectedRoleMask);
+            combinedRoleMask |= roleMask;
 
-            if (!claimedRoles.Add(entry.SelectedRole))
+            for (int roleValue = (int)Define.TitanRole.Body; roleValue <= (int)Define.TitanRole.RightLeg; roleValue++)
             {
-                missingUserId = $"Duplicate role: {GetRoleLabel((Define.TitanRole)entry.SelectedRole)}";
-                return false;
+                int bit = 1 << (roleValue - 1);
+                if ((roleMask & bit) == 0)
+                    continue;
+
+                if (ownerByRoleValue.TryGetValue(roleValue, out string existingOwner) && !string.Equals(existingOwner, userId))
+                {
+                    missingUserId = $"Duplicate role: {GetRoleLabel((Define.TitanRole)roleValue)}";
+                    return false;
+                }
+
+                ownerByRoleValue[roleValue] = userId;
             }
         }
 
         for (int roleValue = (int)Define.TitanRole.Body; roleValue <= (int)Define.TitanRole.RightLeg; roleValue++)
         {
-            if (!claimedRoles.Contains(roleValue))
+            int bit = 1 << (roleValue - 1);
+            if ((combinedRoleMask & bit) == 0)
             {
                 missingUserId = $"Missing role: {GetRoleLabel((Define.TitanRole)roleValue)}";
                 return false;
@@ -596,14 +623,15 @@ public class LobbyScene : BaseScene
         return true;
     }
 
-    private static int NormalizeRoleValue(int roleValue)
+    private static int NormalizeRoleMask(int roleMask)
     {
-        return IsValidRoleValue(roleValue) ? roleValue : 0;
+        return roleMask & GetAllRoleMask();
     }
 
-    private static bool IsValidRoleValue(int roleValue)
+    private static int GetAllRoleMask()
     {
-        return roleValue >= (int)Define.TitanRole.Body && roleValue <= (int)Define.TitanRole.RightLeg;
+        int count = ((int)Define.TitanRole.RightLeg - (int)Define.TitanRole.Body) + 1;
+        return (1 << count) - 1;
     }
 
     private static string GetRoleLabel(Define.TitanRole role)
