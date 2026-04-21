@@ -275,11 +275,9 @@ public class UI_HostStartButton : UI_Base, ILobbyWorldButtonInteractionTarget
 
     private void SetVisible(bool visible)
     {
-        if (_buttonRoot == null)
-            return;
-
-        if (_buttonRoot.activeSelf != visible)
-            _buttonRoot.SetActive(visible);
+        GameObject root = _buttonRoot != null ? _buttonRoot : gameObject;
+        if (root.activeSelf != visible)
+            root.SetActive(visible);
     }
 
     private GameObject FindButtonRoot()

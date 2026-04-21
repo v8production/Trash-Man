@@ -357,7 +357,7 @@ public class LobbyNetworkPlayer : NetworkBehaviour
                 if (obj == null)
                     continue;
 
-                if (!obj.TryGetComponent(out LobbyNetworkPlayer player) || player == null)
+                if (!obj.TryGetComponent(out LobbyNetworkPlayer player))
                     continue;
 
                 if (!player.IsSpawned)

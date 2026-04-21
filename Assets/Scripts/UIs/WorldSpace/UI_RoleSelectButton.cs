@@ -287,9 +287,6 @@ public class UI_RoleSelectButton : UI_Base, ILobbyWorldButtonInteractionTarget
 
     private void SetVisible(bool visible)
     {
-        if (_buttonRoot == null)
-            return;
-
         if (_buttonRoot.activeSelf != visible)
             _buttonRoot.SetActive(visible);
     }
