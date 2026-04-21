@@ -21,6 +21,28 @@ public struct TitanAggregatedInput
 
 public abstract class TitanBaseController : MonoBehaviour
 {
+    private static float s_nextInputLogTime;
+    private const float InputLogIntervalSeconds = 0.20f;
+
+    private static void MaybeLogInput(in TitanAggregatedInput input, string source)
+    {
+        if (!InputDebug.Enabled)
+            return;
+
+        if (Time.unscaledTime < s_nextInputLogTime)
+            return;
+
+        bool hasWs = Mathf.Abs(input.LeftArmElbow) > 0.001f;
+        bool hasWaist = Mathf.Abs(input.BodyWaist) > 0.001f;
+        bool hasArrows = Mathf.Abs(input.BodyForward) > 0.001f || Mathf.Abs(input.BodyStrafe) > 0.001f;
+        bool hasTurn = Mathf.Abs(input.BodyTurn) > 0.001f;
+
+        if (!hasWs && !hasWaist && !hasArrows && !hasTurn)
+            return;
+
+        s_nextInputLogTime = Time.unscaledTime + InputLogIntervalSeconds;
+        InputDebug.Log($"{source} arrows(fwd={input.BodyForward}, strafe={input.BodyStrafe}) turn={input.BodyTurn} waist(A/D)={input.BodyWaist} ws(W/S)={input.LeftArmElbow}");
+    }
     protected TitanRigManager rigManager => Managers.TitanRig;
 
     private static TitanAggregatedInput sharedInput;
@@ -86,6 +108,8 @@ public abstract class TitanBaseController : MonoBehaviour
             sharedInput = input;
             hasSharedInput = true;
         }
+
+        MaybeLogInput(input, updateShared ? "CaptureCurrentInputSnapshot(shared)" : "CaptureCurrentInputSnapshot");
 
         return input;
     }

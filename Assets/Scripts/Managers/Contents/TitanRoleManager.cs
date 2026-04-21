@@ -25,7 +25,9 @@ public class TitanRoleManager
         _playersByRole.Clear();
         _roleMasksByClientId.Clear();
 
-        LobbyNetworkPlayer[] players = UnityEngine.Object.FindObjectsByType<LobbyNetworkPlayer>();
+        bool hadDuplicate = false;
+
+        LobbyNetworkPlayer[] players = LobbyNetworkPlayer.FindAllSpawnedPlayers();
         if (players == null || players.Length == 0)
         {
             error = "No lobby players were found.";
@@ -56,8 +58,19 @@ public class TitanRoleManager
                     && existing != null
                     && existing.OwnerClientId != player.OwnerClientId)
                 {
-                    error = $"Duplicate role selected: {role}";
-                    return false;
+                    // Duplicates should be blocked before starting the game (requireAllRoles == true).
+                    // During runtime, keep routing alive by deterministically choosing a single owner.
+                    if (requireAllRoles)
+                    {
+                        error = $"Duplicate role selected: {role}";
+                        return false;
+                    }
+
+                    hadDuplicate = true;
+
+                    LobbyNetworkPlayer winner = existing.OwnerClientId <= player.OwnerClientId ? existing : player;
+                    _playersByRole[role] = winner;
+                    continue;
                 }
 
                 _playersByRole[role] = player;
@@ -76,6 +89,9 @@ public class TitanRoleManager
                 }
             }
         }
+
+        if (hadDuplicate && string.IsNullOrWhiteSpace(error))
+            error = "Duplicate role masks detected; routing uses deterministic ownership.";
 
         return _playersByRole.Count > 0;
     }

@@ -539,15 +539,7 @@ public class LobbyScene : BaseScene
 
     private static LobbyNetworkPlayer FindLocalOwnedNetworkPlayer()
     {
-        LobbyNetworkPlayer[] players = FindObjectsByType<LobbyNetworkPlayer>();
-        for (int i = 0; i < players.Length; i++)
-        {
-            LobbyNetworkPlayer player = players[i];
-            if (player != null && player.IsOwner)
-                return player;
-        }
-
-        return null;
+        return LobbyNetworkPlayer.FindLocalOwnedPlayer();
     }
 
     private void HandleHostStartButtonClicked()
@@ -558,10 +550,12 @@ public class LobbyScene : BaseScene
             return;
         }
 
-        if (!AreAllLobbyUsersReadyForGame(out string missingUserId))
+        // Validate using network-synced role masks, not the lobby UI registry.
+        // The UI registry can be stale while identities/objects are still syncing.
+        if (!Managers.TitanRole.RefreshRoleMap(requireAllRoles: true, out string roleError))
         {
-            string missingLabel = string.IsNullOrWhiteSpace(missingUserId) ? "unknown requirement" : missingUserId;
-            Managers.Toast.EnqueueMessage($"Cannot start game: {missingLabel}", 2.8f);
+            string label = string.IsNullOrWhiteSpace(roleError) ? "role requirements" : roleError;
+            Managers.Toast.EnqueueMessage($"Cannot start game: {label}", 2.8f);
             return;
         }
 

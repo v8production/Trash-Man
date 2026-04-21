@@ -2,6 +2,9 @@ using UnityEngine;
 
 public class TitanRoleNetworkDriver : MonoBehaviour
 {
+    private float _nextDebugLogTime;
+    private const float DebugLogIntervalSeconds = 0.50f;
+    private bool _shouldLogThisFrame;
     [Header("Role Controllers")]
     [SerializeField] private TitanBodyRoleController _bodyController;
     [SerializeField] private TitanLeftArmRoleController _leftArmController;
@@ -24,6 +27,14 @@ public class TitanRoleNetworkDriver : MonoBehaviour
             return;
 
         _localPlayer ??= LobbyNetworkPlayer.FindLocalOwnedPlayer();
+
+        _shouldLogThisFrame = InputDebug.Enabled && Time.unscaledTime >= _nextDebugLogTime;
+        if (_shouldLogThisFrame)
+            _nextDebugLogTime = Time.unscaledTime + DebugLogIntervalSeconds;
+
+        if (_shouldLogThisFrame && _localPlayer == null)
+            InputDebug.LogWarning("No local LobbyNetworkPlayer found (cannot publish local role input).");
+
         _localPlayer?.PublishLocalRoleInput();
 
         float dt = Time.fixedDeltaTime;
@@ -40,10 +51,11 @@ public class TitanRoleNetworkDriver : MonoBehaviour
         if (_bodyController == null)
             return;
 
-        if (Managers.TitanRole.TryGetRoleInput(Define.TitanRole.Body, out TitanAggregatedInput input))
-            TitanBaseController.SetSharedInput(input);
-        else
-            TitanBaseController.SetSharedInput(default);
+        bool ok = Managers.TitanRole.TryGetRoleInput(Define.TitanRole.Body, out TitanAggregatedInput input);
+        TitanBaseController.SetSharedInput(ok ? input : default);
+
+        // if (_shouldLogThisFrame)
+        //     InputDebug.Log($"TickRole Body ok={ok} input(waist={input.BodyWaist}, ws={input.LeftArmElbow}, fwd={input.BodyForward}, strafe={input.BodyStrafe})");
 
         _bodyController.SetInputEnabled(true);
         _bodyController.TickRoleInput(dt);
@@ -57,10 +69,11 @@ public class TitanRoleNetworkDriver : MonoBehaviour
             return;
 
         Define.TitanRole role = left ? Define.TitanRole.LeftArm : Define.TitanRole.RightArm;
-        if (Managers.TitanRole.TryGetRoleInput(role, out TitanAggregatedInput input))
-            TitanBaseController.SetSharedInput(input);
-        else
-            TitanBaseController.SetSharedInput(default);
+        bool ok = Managers.TitanRole.TryGetRoleInput(role, out TitanAggregatedInput input);
+        TitanBaseController.SetSharedInput(ok ? input : default);
+
+        // if (_shouldLogThisFrame)
+        //     InputDebug.Log($"TickRole {role} ok={ok} input(ws={input.LeftArmElbow}, mouse={input.MousePosition})");
 
         controller.TickRoleInput(dt);
     }
@@ -72,10 +85,11 @@ public class TitanRoleNetworkDriver : MonoBehaviour
             return;
 
         Define.TitanRole role = left ? Define.TitanRole.LeftLeg : Define.TitanRole.RightLeg;
-        if (Managers.TitanRole.TryGetRoleInput(role, out TitanAggregatedInput input))
-            TitanBaseController.SetSharedInput(input);
-        else
-            TitanBaseController.SetSharedInput(default);
+        bool ok = Managers.TitanRole.TryGetRoleInput(role, out TitanAggregatedInput input);
+        TitanBaseController.SetSharedInput(ok ? input : default);
+
+        // if (_shouldLogThisFrame)
+        //     InputDebug.Log($"TickRole {role} ok={ok} input(ws={input.LeftArmElbow}, mouse={input.MousePosition})");
 
         controller.TickRoleInput(dt);
     }

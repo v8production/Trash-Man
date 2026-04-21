@@ -2,6 +2,7 @@ using Unity.Collections;
 using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using System.Collections.Generic;
 
 [RequireComponent(typeof(NetworkObject))]
 public class LobbyNetworkPlayer : NetworkBehaviour
@@ -27,6 +28,9 @@ public class LobbyNetworkPlayer : NetworkBehaviour
     public int ActiveTitanRoleValue => NormalizeTitanRoleValue(_activeTitanRole.Value);
     public TitanRoleInputPayload CurrentRoleInput => _roleInput.Value;
     public string DisplayName => GetDisplayName();
+
+    private float _nextPublishLogTime;
+    private const float PublishLogIntervalSeconds = 0.50f;
 
     private void Awake()
     {
@@ -64,8 +68,11 @@ public class LobbyNetworkPlayer : NetworkBehaviour
         }
         else if (isGameScene)
         {
-            Transform runtimeRoot = NetworkManager != null ? NetworkManager.transform : GameObject.Find("@LobbyNetworkRuntime")?.transform;
+            Transform runtimeRoot = NetworkManager != null ? NetworkManager.transform : GameObject.Find("@NetworkManager")?.transform;
             PrepareForGameScene(runtimeRoot);
+
+            // Always print once per spawn so we can verify this object exists in GameScene builds.
+            Debug.Log($"{InputDebug.Prefix} OnNetworkSpawn(Game) ownerClientId={OwnerClientId} isOwner={IsOwner} selectedMask=0x{SelectedTitanRoleMaskValue:X} activeRole={ActiveTitanRoleValue}");
         }
 
         if (IsOwner)
@@ -118,6 +125,7 @@ public class LobbyNetworkPlayer : NetworkBehaviour
     [Rpc(SendTo.Server, InvokePermission = RpcInvokePermission.Owner)]
     private void SubmitSelectedTitanRoleMaskServerRpc(int titanRoleMask)
     {
+        InputDebug.Log($"[ServerRpc] SubmitSelectedTitanRoleMaskServerRpc from client={OwnerClientId} raw=0x{titanRoleMask:X}");
         _selectedTitanRoleMask.Value = NormalizeTitanRoleMask(titanRoleMask);
 
         int normalizedMask = NormalizeTitanRoleMask(_selectedTitanRoleMask.Value);
@@ -136,6 +144,7 @@ public class LobbyNetworkPlayer : NetworkBehaviour
     [Rpc(SendTo.Server, InvokePermission = RpcInvokePermission.Owner)]
     private void SubmitActiveTitanRoleServerRpc(int titanRoleValue)
     {
+        InputDebug.Log($"[ServerRpc] SubmitActiveTitanRoleServerRpc from client={OwnerClientId} value={titanRoleValue}");
         int normalizedRoleValue = NormalizeTitanRoleValue(titanRoleValue);
         if (normalizedRoleValue == 0)
             return;
@@ -151,6 +160,14 @@ public class LobbyNetworkPlayer : NetworkBehaviour
     [Rpc(SendTo.Server, InvokePermission = RpcInvokePermission.Owner)]
     private void SubmitRoleInputServerRpc(TitanRoleInputPayload inputPayload)
     {
+        TitanAggregatedInput snapshot = inputPayload.ToAggregatedInput();
+        bool hasInput = Mathf.Abs(snapshot.BodyWaist) > 0.001f
+            || Mathf.Abs(snapshot.LeftArmElbow) > 0.001f
+            || Mathf.Abs(snapshot.BodyForward) > 0.001f
+            || Mathf.Abs(snapshot.BodyStrafe) > 0.001f
+            || Mathf.Abs(snapshot.BodyTurn) > 0.001f;
+        if (hasInput)
+            InputDebug.Log($"[ServerRpc] SubmitRoleInputServerRpc from client={OwnerClientId} waist={snapshot.BodyWaist} ws={snapshot.LeftArmElbow} fwd={snapshot.BodyForward} strafe={snapshot.BodyStrafe}");
         _roleInput.Value = inputPayload;
     }
 
@@ -253,9 +270,15 @@ public class LobbyNetworkPlayer : NetworkBehaviour
         if (!TitanInputUtility.WasDigitPressedThisFrame(digit))
             return;
 
-        if (!HasSelectedTitanRoleValue(role))
-            return;
+        InputDebug.Log($"Digit{digit} pressed (client={OwnerClientId}, isOwner={IsOwner}). role={role}, selectedMask=0x{SelectedTitanRoleMaskValue:X}, activeRole={ActiveTitanRoleValue}");
 
+        if (!HasSelectedTitanRoleValue(role))
+        {
+            InputDebug.LogWarning($"Digit{digit} ignored: role {role} not in selectedMask (mask=0x{SelectedTitanRoleMaskValue:X}).");
+            return;
+        }
+
+        InputDebug.Log($"Switching active role -> {role} (rpc)");
         SubmitActiveTitanRoleServerRpc((int)role);
     }
 
@@ -275,16 +298,42 @@ public class LobbyNetworkPlayer : NetworkBehaviour
                 SubmitActiveTitanRoleServerRpc((int)GetFirstRoleFromMask(mask));
         }
 
+        int selectedMask = NormalizeTitanRoleMask(_selectedTitanRoleMask.Value);
+        int activeRole = NormalizeTitanRoleValue(_activeTitanRole.Value);
+
+        if (Time.unscaledTime >= _nextPublishLogTime)
+        {
+            _nextPublishLogTime = Time.unscaledTime + PublishLogIntervalSeconds;
+            InputDebug.Log($"PublishLocalRoleInput (client={OwnerClientId}, isOwner={IsOwner}) selectedMask=0x{selectedMask:X}, activeRole={activeRole}");
+        }
+
         TitanAggregatedInput currentInput = TitanBaseController.CaptureCurrentInputSnapshot(updateShared: false);
         TitanRoleInputPayload payload = new(currentInput);
         if (_roleInput.Value.Equals(payload))
             return;
+
+        InputDebug.Log($"SubmitRoleInputServerRpc (mask=0x{selectedMask:X}, activeRole={activeRole}) waist={currentInput.BodyWaist} ws={currentInput.LeftArmElbow}");
 
         SubmitRoleInputServerRpc(payload);
     }
 
     public static LobbyNetworkPlayer FindLocalOwnedPlayer()
     {
+        NetworkManager networkManager = NetworkManager.Singleton;
+        if (networkManager != null && networkManager.SpawnManager != null)
+        {
+            ulong localClientId = networkManager.LocalClientId;
+            var spawned = networkManager.SpawnManager.SpawnedObjectsList;
+            foreach (NetworkObject obj in spawned)
+            {
+                if (obj == null || !obj.IsPlayerObject || obj.OwnerClientId != localClientId)
+                    continue;
+
+                if (obj.TryGetComponent(out LobbyNetworkPlayer player))
+                    return player;
+            }
+        }
+
         LobbyNetworkPlayer[] players = Object.FindObjectsByType<LobbyNetworkPlayer>();
         for (int i = 0; i < players.Length; i++)
         {
@@ -294,6 +343,33 @@ public class LobbyNetworkPlayer : NetworkBehaviour
         }
 
         return null;
+    }
+
+    public static LobbyNetworkPlayer[] FindAllSpawnedPlayers()
+    {
+        NetworkManager networkManager = NetworkManager.Singleton;
+        if (networkManager != null && networkManager.SpawnManager != null)
+        {
+            var spawned = networkManager.SpawnManager.SpawnedObjectsList;
+            List<LobbyNetworkPlayer> result = new();
+            foreach (NetworkObject obj in spawned)
+            {
+                if (obj == null)
+                    continue;
+
+                if (!obj.TryGetComponent(out LobbyNetworkPlayer player) || player == null)
+                    continue;
+
+                if (!player.IsSpawned)
+                    continue;
+
+                result.Add(player);
+            }
+
+            return result.ToArray();
+        }
+
+        return Object.FindObjectsByType<LobbyNetworkPlayer>();
     }
 
     public static bool RequestLoadGameForAll()
@@ -465,8 +541,10 @@ public class LobbyNetworkPlayer : NetworkBehaviour
         if (_lobbyRanger != null)
             Destroy(_lobbyRanger.gameObject);
 
-        if (runtimeRoot != null)
-            transform.SetParent(runtimeRoot, true);
+        // Netcode forbids parenting a NetworkObject under a non-NetworkObject parent.
+        // This object is kept alive via DontDestroyOnLoad, so we don't need to reparent it.
+        // if (runtimeRoot != null)
+        //     transform.SetParent(runtimeRoot, true);
 
         gameObject.hideFlags = HideFlags.HideInHierarchy;
     }

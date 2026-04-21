@@ -1038,7 +1038,9 @@ public class DiscordManager
 
     private static void LogVoice(string message)
     {
-        Debug.Log($"[DiscordVoice] {message}");
+        // Debug noise while investigating input routing.
+        // Re-enable if you need voice diagnostics again.
+        // Debug.Log($"[DiscordVoice] {message}");
     }
 
     private static string SummarizeSecret(string secret)

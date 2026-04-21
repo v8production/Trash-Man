@@ -230,19 +230,23 @@ public class LobbySessionManager
         if (string.IsNullOrWhiteSpace(userId))
             return;
 
+        // Voice indicators are authored for the LobbyScene (ranger + nickname UI).
+        // In GameScene the lobby ranger objects are destroyed, so ignore voice updates.
+        bool isLobbyScene = Managers.Scene.CurrentScene != null && Managers.Scene.CurrentScene.SceneType == Define.Scene.Lobby;
+        if (!isLobbyScene)
+            return;
+
         if (LobbyScene.TrySetNicknameSpeakerActive(userId, isVoiceChatActive))
             return;
 
         if (!_rangersByUserId.TryGetValue(userId, out RangerController ranger) || ranger == null)
         {
-            Debug.Log($"[LobbyVoice] Ranger not found for userId={userId}");
             return;
         }
 
         UI_Nickname nicknameUI = ranger.GetComponentInChildren<UI_Nickname>(true);
         if (nicknameUI == null)
         {
-            Debug.Log($"[LobbyVoice] UI_Nickname not found under Ranger. userId={userId}");
             return;
         }
 
@@ -462,7 +466,11 @@ public class LobbySessionManager
 
     private void HandleLobbyUserVoiceChatStateChanged(string userId, bool isActive)
     {
-        Debug.Log($"[LobbyVoice] Lobby user speaking indicator event. userId={userId}, speaking={isActive}");
+        // Debug noise while investigating input routing.
+        // Debug.Log($"[LobbyVoice] Lobby user speaking indicator event. userId={userId}, speaking={isActive}");
+        if (Managers.Scene.CurrentScene == null || Managers.Scene.CurrentScene.SceneType != Define.Scene.Lobby)
+            return;
+
         SetRangerNicknameVoiceActive(userId, isActive);
     }
 

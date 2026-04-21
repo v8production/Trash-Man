@@ -5,11 +5,12 @@ using UnityEngine;
 
 public static class LobbyNetworkRuntime
 {
-    private const string RuntimeRootName = "@LobbyNetworkRuntime";
+    private const string RuntimeRootName = "@NetworkManager";
     private const string NetworkObjectPrefabPath = "Prefabs/@NetworkObject";
     private const uint LobbyPlayerPrefabHash = 1804289383;
 
     private static GameObject s_runtimePlayerPrefab;
+    private static bool s_inputDebugBootLogged;
 
     public static bool EnsureSetup()
     {
@@ -20,6 +21,19 @@ public static class LobbyNetworkRuntime
     {
         networkManager = Object.FindAnyObjectByType<NetworkManager>();
         transport = networkManager != null ? networkManager.GetComponent<UnityTransport>() : null;
+
+        if (!s_inputDebugBootLogged)
+        {
+            s_inputDebugBootLogged = true;
+            Debug.Log($"{InputDebug.Prefix} Boot Debug.isDebugBuild={Debug.isDebugBuild} Enabled={InputDebug.Enabled}");
+        }
+
+        // Keep the NetworkManager under a stable, cross-scene runtime root name.
+        if (networkManager != null)
+        {
+            networkManager.gameObject.name = RuntimeRootName;
+            Object.DontDestroyOnLoad(networkManager.gameObject);
+        }
 
         if (networkManager == null)
         {
