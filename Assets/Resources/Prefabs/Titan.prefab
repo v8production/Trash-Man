@@ -63,5 +63,296 @@ PrefabInstance:
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
-    m_AddedComponents: []
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 7bd5342e1d2f38c4d823edf668badc2a, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 8964549570289228038}
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 7bd5342e1d2f38c4d823edf668badc2a, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 205533375885368703}
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 7bd5342e1d2f38c4d823edf668badc2a, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 3344556677889901002}
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 7bd5342e1d2f38c4d823edf668badc2a, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 3344556677889901003}
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 7bd5342e1d2f38c4d823edf668badc2a, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 3344556677889901004}
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 7bd5342e1d2f38c4d823edf668badc2a, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 3344556677889901005}
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 7bd5342e1d2f38c4d823edf668badc2a, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 3344556677889901006}
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 7bd5342e1d2f38c4d823edf668badc2a, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 3344556677889901007}
   m_SourcePrefab: {fileID: 100100000, guid: 7bd5342e1d2f38c4d823edf668badc2a, type: 3}
+--- !u!4 &1581880232147977060 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 5026965684383827013, guid: 7bd5342e1d2f38c4d823edf668badc2a, type: 3}
+  m_PrefabInstance: {fileID: 5778304239401060129}
+  m_PrefabAsset: {fileID: 0}
+--- !u!4 &1667770833472943588 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: -4101172136011681083, guid: 7bd5342e1d2f38c4d823edf668badc2a, type: 3}
+  m_PrefabInstance: {fileID: 5778304239401060129}
+  m_PrefabAsset: {fileID: 0}
+--- !u!4 &3118277338547812540 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 8896563786012999581, guid: 7bd5342e1d2f38c4d823edf668badc2a, type: 3}
+  m_PrefabInstance: {fileID: 5778304239401060129}
+  m_PrefabAsset: {fileID: 0}
+--- !u!4 &3504008586656321441 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 6958083594106685568, guid: 7bd5342e1d2f38c4d823edf668badc2a, type: 3}
+  m_PrefabInstance: {fileID: 5778304239401060129}
+  m_PrefabAsset: {fileID: 0}
+--- !u!4 &4234910824637799797 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: -1516088123671684524, guid: 7bd5342e1d2f38c4d823edf668badc2a, type: 3}
+  m_PrefabInstance: {fileID: 5778304239401060129}
+  m_PrefabAsset: {fileID: 0}
+--- !u!4 &6321383075345277130 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: 7bd5342e1d2f38c4d823edf668badc2a, type: 3}
+  m_PrefabInstance: {fileID: 5778304239401060129}
+  m_PrefabAsset: {fileID: 0}
+--- !u!4 &6677274728303296434 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 908276781140129939, guid: 7bd5342e1d2f38c4d823edf668badc2a, type: 3}
+  m_PrefabInstance: {fileID: 5778304239401060129}
+  m_PrefabAsset: {fileID: 0}
+--- !u!1 &6697346080426654320 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 919132149155446097, guid: 7bd5342e1d2f38c4d823edf668badc2a, type: 3}
+  m_PrefabInstance: {fileID: 5778304239401060129}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &8964549570289228038
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6697346080426654320}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 561e940732ad890499d371ca38baf139, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::TitanController
+  attachControllersOnAwake: 1
+  rigRuntime: {fileID: 3344556677889901002}
+  bodyController: {fileID: 3344556677889901003}
+  leftArmController: {fileID: 3344556677889901004}
+  rightArmController: {fileID: 3344556677889901005}
+  leftLegController: {fileID: 3344556677889901006}
+  rightLegController: {fileID: 3344556677889901007}
+--- !u!114 &205533375885368703
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6697346080426654320}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 95961ef3b977512027eaab6c83fac161, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::TitanRoleNetworkDriver
+  _bodyController: {fileID: 3344556677889901003}
+  _leftArmController: {fileID: 3344556677889901004}
+  _rightArmController: {fileID: 3344556677889901005}
+  _leftLegController: {fileID: 3344556677889901006}
+  _rightLegController: {fileID: 3344556677889901007}
+--- !u!114 &3344556677889901002
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6697346080426654320}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d3c2b54b8d3c4f4bb9b9b9d9f9a9a9a9, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::TitanRigRuntime
+  mechaRoot: {fileID: 6321383075345277130}
+  leftShoulder: {fileID: 4234910824637799797}
+  leftElbow: {fileID: 3504008586656321441}
+  rightShoulder: {fileID: 8457973227273369157}
+  rightElbow: {fileID: 1667770833472943588}
+  leftHip: {fileID: 1581880232147977060}
+  leftKnee: {fileID: 3118277338547812540}
+  rightHip: {fileID: 7650065672122287338}
+  rightKnee: {fileID: 6782418227976457030}
+  spine: {fileID: 6677274728303296434}
+  waistYaw: 0
+  leftArm:
+    ShoulderYaw: 0
+    ShoulderPitch: 0
+    ElbowPitch: 0
+  rightArm:
+    ShoulderYaw: 0
+    ShoulderPitch: 0
+    ElbowPitch: 0
+  leftLeg:
+    HipYaw: 0
+    HipRoll: 0
+    KneeRoll: 0
+  rightLeg:
+    HipYaw: 0
+    HipRoll: 0
+    KneeRoll: 0
+--- !u!114 &3344556677889901003
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6697346080426654320}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 92fce1c641312f24c8dda8374fce8e28, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::TitanBodyRoleController
+  moveSpeed: 3.5
+  strafeSpeed: 1.75
+  turnSpeed: 75
+  bodySmoothing: 8
+  waistTurnSpeed: 120
+  waistYawLimit: {x: -180, y: 180}
+  gravityScale: 1
+  groundProbeHeight: 0.35
+  groundProbeDistance: 0.7
+  groundLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  movementAcceleration: 8
+  maxPlanarSpeed: 4.5
+  turnAcceleration: 85
+  balanceTorque: 160
+  oneLegInstabilityMultiplier: 2.2
+  uprightRecoverySpeed: 5
+  gravityRollAcceleration: 120
+  rollDamping: 6
+  maxRollAngle: 65
+  maxBalanceTorque: 240
+  centerOfPressure: {fileID: 0}
+  centerOfPressureLocalOffset: {x: 0, y: 1.1, z: -0.6}
+  dragTorqueScale: 0.03
+  maxDragTorque: 160
+  minDragSpeed: 0.75
+  leftFoot: {fileID: 0}
+  rightFoot: {fileID: 0}
+--- !u!114 &3344556677889901004
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6697346080426654320}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0a7db2de24a788049bbb787109d7ef8c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::TitanLeftArmRoleController
+  maxThetaDegrees: 55
+  thetaRadiusPixels: 260
+  useScreenCenterAsOrigin: 1
+  mouseOriginPixels: {x: 960, y: 540}
+  useSingleAxisMouseAssist: 1
+  singleAxisDeadZonePixels: 2
+  mouseSensitivity: 0.35
+  mouseResponseSpeed: 5
+  elbowSpeed: 120
+  shoulderYawLimit: {x: -15, y: 45}
+  shoulderPitchLimit: {x: -360, y: 360}
+  elbowPitchLimit: {x: -130, y: 15}
+--- !u!114 &3344556677889901005
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6697346080426654320}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f19fa9691dff0ea4aa1f438e4068f3a8, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::TitanRightArmRoleController
+  maxThetaDegrees: 55
+  thetaRadiusPixels: 260
+  useScreenCenterAsOrigin: 1
+  mouseOriginPixels: {x: 960, y: 540}
+  useSingleAxisMouseAssist: 1
+  singleAxisDeadZonePixels: 2
+  mouseSensitivity: 0.35
+  mouseResponseSpeed: 5
+  elbowSpeed: 120
+  shoulderYawLimit: {x: -15, y: 45}
+  shoulderPitchLimit: {x: -360, y: 360}
+  elbowPitchLimit: {x: -130, y: 15}
+--- !u!114 &3344556677889901006
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6697346080426654320}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5ead31b4de2d97c4685766d42b8a2643, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::TitanLeftLegRoleController
+  maxThetaDegrees: 55
+  thetaRadiusPixels: 260
+  useScreenCenterAsOrigin: 1
+  mouseOriginPixels: {x: 960, y: 540}
+  useSingleAxisMouseAssist: 1
+  singleAxisDeadZonePixels: 2
+  mouseSensitivity: 0.35
+  mouseResponseSpeed: 12
+  kneeSpeed: 110
+  hipYawLimit: {x: -40, y: 40}
+  hipRollLimit: {x: -90, y: 45}
+  kneeRollLimit: {x: -5, y: 125}
+--- !u!114 &3344556677889901007
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6697346080426654320}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 68f3bad04f0a451438fc898d3de6ec25, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::TitanRightLegRoleController
+  maxThetaDegrees: 55
+  thetaRadiusPixels: 260
+  useScreenCenterAsOrigin: 1
+  mouseOriginPixels: {x: 960, y: 540}
+  useSingleAxisMouseAssist: 1
+  singleAxisDeadZonePixels: 2
+  mouseSensitivity: 0.35
+  mouseResponseSpeed: 12
+  kneeSpeed: 110
+  hipYawLimit: {x: -40, y: 40}
+  hipRollLimit: {x: -90, y: 45}
+  kneeRollLimit: {x: -5, y: 125}
+--- !u!4 &6782418227976457030 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: -8201243596049249177, guid: 7bd5342e1d2f38c4d823edf668badc2a, type: 3}
+  m_PrefabInstance: {fileID: 5778304239401060129}
+  m_PrefabAsset: {fileID: 0}
+--- !u!4 &7650065672122287338 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: -5036476678694501429, guid: 7bd5342e1d2f38c4d823edf668badc2a, type: 3}
+  m_PrefabInstance: {fileID: 5778304239401060129}
+  m_PrefabAsset: {fileID: 0}
+--- !u!4 &8457973227273369157 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: -6534607877774577308, guid: 7bd5342e1d2f38c4d823edf668badc2a, type: 3}
+  m_PrefabInstance: {fileID: 5778304239401060129}
+  m_PrefabAsset: {fileID: 0}

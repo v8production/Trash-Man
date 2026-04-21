@@ -55,17 +55,14 @@ public class TitanBodyRoleController : TitanBaseController
     protected override void Awake()
     {
         base.Awake();
-        if (rigManager != null)
+        Transform movementRoot = Managers.TitanRig.MovementRoot;
+        movementRigidbody = movementRoot.GetComponent<Rigidbody>();
+        if (movementRigidbody == null)
         {
-            Transform movementRoot = rigManager.MovementRoot;
-            movementRigidbody = movementRoot.GetComponent<Rigidbody>();
-            if (movementRigidbody == null)
-            {
-                movementRigidbody = movementRoot.GetComponentInParent<Rigidbody>();
-            }
-
-            ResolveFeet(movementRoot);
+            movementRigidbody = movementRoot.GetComponentInParent<Rigidbody>();
         }
+
+        ResolveFeet(movementRoot);
     }
 
     public void SetInputEnabled(bool enabled)
@@ -81,7 +78,7 @@ public class TitanBodyRoleController : TitanBaseController
 
     public override void TickRoleInput(float deltaTime)
     {
-        if (!inputEnabled || rigManager == null || !rigManager.EnsureReady())
+        if (!inputEnabled || Managers.TitanRig == null || !Managers.TitanRig.EnsureReady())
         {
             return;
         }
@@ -95,12 +92,12 @@ public class TitanBodyRoleController : TitanBaseController
 
     public void TickPhysics(float deltaTime)
     {
-        if (rigManager == null || !rigManager.EnsureReady())
+        if (Managers.TitanRig == null || !Managers.TitanRig.EnsureReady())
         {
             return;
         }
 
-        Transform movementRoot = rigManager.MovementRoot;
+        Transform movementRoot = Managers.TitanRig.MovementRoot;
         if (movementRigidbody == null)
         {
             movementRigidbody = movementRoot.GetComponent<Rigidbody>();
@@ -418,17 +415,17 @@ public class TitanBodyRoleController : TitanBaseController
 
     private void UpdateWaistRotation(float waistInput, float deltaTime)
     {
-        if (rigManager == null || !rigManager.EnsureReady() || rigManager.Spine == null)
+        if (Managers.TitanRig == null || !Managers.TitanRig.EnsureReady() || Managers.TitanRig.Spine == null)
         {
             return;
         }
 
         float nextWaistYaw = Mathf.Clamp(
-            rigManager.WaistYaw + (waistInput * waistTurnSpeed * deltaTime),
+            Managers.TitanRig.WaistYaw + (waistInput * waistTurnSpeed * deltaTime),
             waistYawLimit.x,
             waistYawLimit.y);
 
-        rigManager.SetWaistYaw(nextWaistYaw);
-        rigManager.ApplyBodyPose();
+        Managers.TitanRig.SetWaistYaw(nextWaistYaw);
+        Managers.TitanRig.ApplyBodyPose();
     }
 }

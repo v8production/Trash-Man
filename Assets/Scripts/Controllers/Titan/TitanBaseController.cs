@@ -43,7 +43,6 @@ public abstract class TitanBaseController : MonoBehaviour
         s_nextInputLogTime = Time.unscaledTime + InputLogIntervalSeconds;
         InputDebug.Log($"{source} arrows(fwd={input.BodyForward}, strafe={input.BodyStrafe}) turn={input.BodyTurn} waist(A/D)={input.BodyWaist} ws(W/S)={input.LeftArmElbow}");
     }
-    protected TitanRigManager rigManager => Managers.TitanRig;
 
     private static TitanAggregatedInput sharedInput;
     private static bool hasSharedInput;

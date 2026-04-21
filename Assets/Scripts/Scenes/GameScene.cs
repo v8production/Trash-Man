@@ -31,15 +31,20 @@ public class GameScene : BaseScene
 
             _titanController = titanObject.GetComponent<TitanController>();
             if (_titanController == null)
-                _titanController = titanObject.AddComponent<TitanController>();
+            {
+                Debug.LogError($"{InputDebug.Prefix} Titan prefab is missing TitanController. Add it to Resources/Prefabs/Titan.prefab");
+                return;
+            }
         }
 
-        // Ensure physics + controllers exist even if the bootstrap ran before Titan was instantiated.
-        TitanCoopBootstrap.EnsureRuntime(_titanController.gameObject);
+        _titanController.EnsureInitialized();
 
         _titanRoleDriver = _titanController.GetComponent<TitanRoleNetworkDriver>();
         if (_titanRoleDriver == null)
-            _titanRoleDriver = _titanController.gameObject.AddComponent<TitanRoleNetworkDriver>();
+        {
+            Debug.LogError($"{InputDebug.Prefix} Titan prefab is missing TitanRoleNetworkDriver. Add it to Resources/Prefabs/Titan.prefab");
+            return;
+        }
     }
 
     protected override void Init()

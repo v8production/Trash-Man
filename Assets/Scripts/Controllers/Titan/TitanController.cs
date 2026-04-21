@@ -23,17 +23,18 @@ public class TitanController : MonoBehaviour
 
     public void EnsureInitialized()
     {
-        rigRuntime = EnsureComponent(rigRuntime);
-        Managers.TitanRig.Bind(rigRuntime);
+        rigRuntime = RequireComponent(rigRuntime);
+        if (rigRuntime != null)
+            Managers.TitanRig.Bind(rigRuntime);
 
-        bodyController = EnsureComponent(bodyController);
-        leftArmController = EnsureComponent(leftArmController);
-        rightArmController = EnsureComponent(rightArmController);
-        leftLegController = EnsureComponent(leftLegController);
-        rightLegController = EnsureComponent(rightLegController);
+        bodyController = RequireComponent(bodyController);
+        leftArmController = RequireComponent(leftArmController);
+        rightArmController = RequireComponent(rightArmController);
+        leftLegController = RequireComponent(leftLegController);
+        rightLegController = RequireComponent(rightLegController);
     }
 
-    private T EnsureComponent<T>(T existing) where T : Component
+    private T RequireComponent<T>(T existing) where T : Component
     {
         if (existing != null)
         {
@@ -46,6 +47,7 @@ public class TitanController : MonoBehaviour
             return found;
         }
 
-        return gameObject.AddComponent<T>();
+        Debug.LogError($"[TitanController] Missing required component '{typeof(T).Name}' on '{gameObject.name}'. Add it to the Titan prefab.", this);
+        return null;
     }
 }

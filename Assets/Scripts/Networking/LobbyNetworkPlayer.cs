@@ -304,7 +304,7 @@ public class LobbyNetworkPlayer : NetworkBehaviour
         if (Time.unscaledTime >= _nextPublishLogTime)
         {
             _nextPublishLogTime = Time.unscaledTime + PublishLogIntervalSeconds;
-            InputDebug.Log($"PublishLocalRoleInput (client={OwnerClientId}, isOwner={IsOwner}) selectedMask=0x{selectedMask:X}, activeRole={activeRole}");
+            // InputDebug.Log($"PublishLocalRoleInput (client={OwnerClientId}, isOwner={IsOwner}) selectedMask=0x{selectedMask:X}, activeRole={activeRole}");
         }
 
         TitanAggregatedInput currentInput = TitanBaseController.CaptureCurrentInputSnapshot(updateShared: false);
@@ -312,7 +312,7 @@ public class LobbyNetworkPlayer : NetworkBehaviour
         if (_roleInput.Value.Equals(payload))
             return;
 
-        InputDebug.Log($"SubmitRoleInputServerRpc (mask=0x{selectedMask:X}, activeRole={activeRole}) waist={currentInput.BodyWaist} ws={currentInput.LeftArmElbow}");
+        // InputDebug.Log($"SubmitRoleInputServerRpc (mask=0x{selectedMask:X}, activeRole={activeRole}) waist={currentInput.BodyWaist} ws={currentInput.LeftArmElbow}");
 
         SubmitRoleInputServerRpc(payload);
     }

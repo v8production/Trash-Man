@@ -47,12 +47,12 @@ public abstract class TitanBaseLegRoleController : TitanBaseController
         float targetYaw = targetAngles.x;
         float targetRoll = targetAngles.y;
 
-        if (rigManager == null || !rigManager.EnsureReady())
+        if (Managers.TitanRig == null || !Managers.TitanRig.EnsureReady())
         {
             return;
         }
 
-        TitanLegControlState state = rigManager.GetLegState(left: IsLeftLeg);
+        TitanLegControlState state = Managers.TitanRig.GetLegState(left: IsLeftLeg);
         float blend = 1f - Mathf.Exp(-mouseResponseSpeed * deltaTime);
         state.HipYaw = Mathf.Lerp(state.HipYaw, targetYaw, blend);
         state.HipRoll = Mathf.Lerp(state.HipRoll, targetRoll, blend);
@@ -66,7 +66,7 @@ public abstract class TitanBaseLegRoleController : TitanBaseController
             kneeRollLimit.x,
             kneeRollLimit.y);
 
-        rigManager.SetLegState(left: IsLeftLeg, state);
-        rigManager.ApplyLegPose(left: IsLeftLeg);
+        Managers.TitanRig.SetLegState(left: IsLeftLeg, state);
+        Managers.TitanRig.ApplyLegPose(left: IsLeftLeg);
     }
 }

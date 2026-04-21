@@ -22,7 +22,7 @@ public abstract class TitanBaseArmRoleController : TitanBaseController
 
     public override void TickRoleInput(float deltaTime)
     {
-        if (rigManager == null || !rigManager.EnsureReady())
+        if (Managers.TitanRig == null || !Managers.TitanRig.EnsureReady())
         {
             return;
         }
@@ -61,7 +61,7 @@ public abstract class TitanBaseArmRoleController : TitanBaseController
         float targetYaw = Mathf.Lerp(shoulderYawLimit.x, shoulderYawLimit.y, yawT);
         float targetPitch = targetAngles.y;
 
-        TitanArmControlState state = rigManager.GetArmState(left: IsLeftArm);
+        TitanArmControlState state = Managers.TitanRig.GetArmState(left: IsLeftArm);
         float blend = 1f - Mathf.Exp(-mouseResponseSpeed * deltaTime);
         state.ShoulderYaw = Mathf.Lerp(state.ShoulderYaw, targetYaw, blend);
         state.ShoulderPitch = Mathf.Lerp(state.ShoulderPitch, targetPitch, blend);
@@ -75,7 +75,7 @@ public abstract class TitanBaseArmRoleController : TitanBaseController
             elbowPitchLimit.x,
             elbowPitchLimit.y);
 
-        rigManager.SetArmState(left: IsLeftArm, state);
-        rigManager.ApplyArmPose(left: IsLeftArm);
+        Managers.TitanRig.SetArmState(left: IsLeftArm, state);
+        Managers.TitanRig.ApplyArmPose(left: IsLeftArm);
     }
 }
