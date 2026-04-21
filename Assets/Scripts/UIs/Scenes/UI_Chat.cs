@@ -37,10 +37,13 @@ public class UI_Chat : UI_Scene
 
         GameObject bubble = GetObject((int)GameObjects.Bubble);
         if (bubble != null)
-            _bubbleCanvasGroup = bubble.GetorAddComponent<CanvasGroup>();
+            _bubbleCanvasGroup = bubble.GetComponent<CanvasGroup>();
 
         if (_bubbleCanvasGroup == null)
-            _bubbleCanvasGroup = gameObject.GetorAddComponent<CanvasGroup>();
+            _bubbleCanvasGroup = GetComponent<CanvasGroup>();
+
+        if (_bubbleCanvasGroup == null)
+            Debug.LogError("[UI_Chat] Missing CanvasGroup. Add it to UI_Chat prefab (Bubble or root).", this);
 
         _isInitialized = true;
     }

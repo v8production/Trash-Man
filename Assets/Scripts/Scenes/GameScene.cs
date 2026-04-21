@@ -64,29 +64,13 @@ public class GameScene : BaseScene
 
     private void EnsureFloorCollision()
     {
-        // A Plane MeshCollider is effectively zero-thickness and can be tunneled through.
-        // Add a BoxCollider with a tiny thickness so dynamic bodies reliably collide.
+        // Plane floor collision should be authored in the scene (static setup).
         GameObject plane = GameObject.Find("Plane");
         if (plane == null)
             return;
 
-        if (plane.GetComponent<Collider>() is BoxCollider)
-            return;
-
-        MeshRenderer renderer = plane.GetComponent<MeshRenderer>();
-        Bounds bounds = renderer != null ? renderer.bounds : new Bounds(plane.transform.position, new Vector3(10f, 0.1f, 10f));
-
-        BoxCollider box = plane.AddComponent<BoxCollider>();
-        Vector3 localCenter = plane.transform.InverseTransformPoint(bounds.center);
-        Vector3 localSize = bounds.size;
-        // Ensure some thickness.
-        localSize.y = Mathf.Max(localSize.y, 0.2f);
-
-        box.center = localCenter;
-        box.size = localSize;
-        box.isTrigger = false;
-
-        InputDebug.Log($"Floor BoxCollider added: name={plane.name} center={box.center} size={box.size} layer={plane.layer}");
+        if (plane.GetComponent<BoxCollider>() == null)
+            Debug.LogError($"{InputDebug.Prefix} Plane is missing BoxCollider. Add it to Game.unity for stable collision.");
     }
 
     private static void CleanupLobbyRangers()

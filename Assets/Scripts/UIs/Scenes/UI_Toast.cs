@@ -35,7 +35,11 @@ public class UI_Toast : UI_Scene
         Bind<TextMeshProUGUI>(typeof(Texts));
         Bind<Image>(typeof(Images));
 
-        _bubbleCanvasGroup = gameObject.GetorAddComponent<CanvasGroup>();
+        _bubbleCanvasGroup = GetComponent<CanvasGroup>();
+        if (_bubbleCanvasGroup == null)
+        {
+            Debug.LogError("[UI_Toast] Missing CanvasGroup. Add it to UI_Toast prefab.", this);
+        }
         _isInitialized = true;
     }
 
