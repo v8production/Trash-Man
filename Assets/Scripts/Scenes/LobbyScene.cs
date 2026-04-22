@@ -14,14 +14,13 @@ public class LobbyScene : BaseScene
     private string _pendingJoinCode = string.Empty;
     private UI_HostStartButton _screenHostStartButton;
     private UI_RoleSelectButton _screenRoleSelectButton;
-    private Transform _screenTransform;
     private LobbyCameraController _localLobbyCamera;
     private const string LobbyCameraPrefabName = "Lobby_Camera";
-    private const string ScreenObjectName = "Screen";
     private const string ScreenHostStartButtonName = "UI_HostStartButton";
     private const string ScreenRoleSelectButtonName = "UI_RoleSelectButton";
-    private static readonly ScreenButtonPlacement s_hostStartButtonPlacement = new(new Vector3(-0.5f, 1.5f, -1f), new Vector3(0f, -90f, 0f));
-    private static readonly ScreenButtonPlacement s_roleSelectButtonPlacement = new(new Vector3(-0.5f, 1.5f, 1f), new Vector3(0f, -90f, 0f));
+    private static readonly Vector3 s_hostStartButtonWorldPosition = new(1.49f, 1.8f, 1.5f);
+    private static readonly Vector3 s_roleSelectButtonWorldPosition = new(1.49f, 1.8f, -1.5f);
+    private static readonly Quaternion s_screenButtonWorldRotation = Quaternion.Euler(0f, -90f, 0f);
 
     private static readonly Dictionary<string, LobbyUserEntry> s_userEntriesByDiscordUserId = new();
 
@@ -30,18 +29,6 @@ public class LobbyScene : BaseScene
         public RangerController Ranger;
         public UI_Nickname Nickname;
         public int SelectedRoleMask;
-    }
-
-    private readonly struct ScreenButtonPlacement
-    {
-        public ScreenButtonPlacement(Vector3 worldPosition, Vector3 worldEulerAngles)
-        {
-            WorldPosition = worldPosition;
-            WorldEulerAngles = worldEulerAngles;
-        }
-
-        public Vector3 WorldPosition { get; }
-        public Vector3 WorldEulerAngles { get; }
     }
 
     public static void RegisterUserObjects(string userId, RangerController ranger, UI_Nickname nickname)
@@ -305,13 +292,6 @@ public class LobbyScene : BaseScene
         if (_screenHostStartButton != null)
             return;
 
-        if (!TryGetScreenTransform(out Transform screenTransform))
-        {
-            Debug.LogWarning("[Lobby] Screen object was not found. Host start button setup skipped.");
-            return;
-        }
-
-        Transform legacyRoot = screenTransform.Find(ScreenHostStartButtonName);
         _screenHostStartButton = Managers.UI.CreateWorldSpaceUI<UI_HostStartButton>(null, ScreenHostStartButtonName);
         if (_screenHostStartButton == null)
         {
@@ -319,8 +299,7 @@ public class LobbyScene : BaseScene
             return;
         }
 
-        SetLegacyButtonHidden(legacyRoot);
-        ApplyScreenButtonTransform(_screenHostStartButton.transform, s_hostStartButtonPlacement, screenTransform);
+        ApplyFixedScreenButtonTransform(_screenHostStartButton.transform, s_hostStartButtonWorldPosition);
         _screenHostStartButton.transform.SetParent(null, true);
 
         _screenHostStartButton.StartButtonClicked -= HandleHostStartButtonClicked;
@@ -332,13 +311,6 @@ public class LobbyScene : BaseScene
         if (_screenRoleSelectButton != null)
             return;
 
-        if (!TryGetScreenTransform(out Transform screenTransform))
-        {
-            Debug.LogWarning("[Lobby] Screen object was not found. Role select button setup skipped.");
-            return;
-        }
-
-        Transform legacyRoot = screenTransform.Find(ScreenRoleSelectButtonName);
         _screenRoleSelectButton = Managers.UI.CreateWorldSpaceUI<UI_RoleSelectButton>(null, ScreenRoleSelectButtonName);
         if (_screenRoleSelectButton == null)
         {
@@ -346,8 +318,7 @@ public class LobbyScene : BaseScene
             return;
         }
 
-        SetLegacyButtonHidden(legacyRoot);
-        ApplyScreenButtonTransform(_screenRoleSelectButton.transform, s_roleSelectButtonPlacement, screenTransform);
+        ApplyFixedScreenButtonTransform(_screenRoleSelectButton.transform, s_roleSelectButtonWorldPosition);
         _screenRoleSelectButton.transform.SetParent(null, true);
 
         _screenRoleSelectButton.RoleSelectButtonClicked -= HandleRoleSelectButtonClicked;
@@ -356,70 +327,19 @@ public class LobbyScene : BaseScene
 
     private void UpdateScreenButtonTransforms()
     {
-        if (!TryGetScreenTransform(out Transform screenTransform))
-            return;
+        if (_screenHostStartButton != null)
+            ApplyFixedScreenButtonTransform(_screenHostStartButton.transform, s_hostStartButtonWorldPosition);
 
-        ApplyScreenButtonTransform(_screenHostStartButton != null ? _screenHostStartButton.transform : null, s_hostStartButtonPlacement, screenTransform);
-        ApplyScreenButtonTransform(_screenRoleSelectButton != null ? _screenRoleSelectButton.transform : null, s_roleSelectButtonPlacement, screenTransform);
+        if (_screenRoleSelectButton != null)
+            ApplyFixedScreenButtonTransform(_screenRoleSelectButton.transform, s_roleSelectButtonWorldPosition);
     }
 
-    private bool TryGetScreenTransform(out Transform screenTransform)
+    private static void ApplyFixedScreenButtonTransform(Transform targetTransform, Vector3 worldPosition)
     {
-        if (_screenTransform != null)
-        {
-            screenTransform = _screenTransform;
-            return true;
-        }
-
-        GameObject screen = GameObject.Find(ScreenObjectName);
-        if (screen == null)
-        {
-            screenTransform = null;
-            return false;
-        }
-
-        UI_HostStartButton legacyHostButtonController = screen.GetComponent<UI_HostStartButton>();
-        if (legacyHostButtonController != null)
-            legacyHostButtonController.enabled = false;
-
-        _screenTransform = screen.transform;
-        screenTransform = _screenTransform;
-        return true;
-    }
-
-    private static void ApplyLegacyTransform(Transform targetTransform, Transform legacyTransform)
-    {
-        if (targetTransform == null || legacyTransform == null)
+        if (targetTransform == null)
             return;
 
-        targetTransform.SetPositionAndRotation(legacyTransform.position, legacyTransform.rotation);
-        targetTransform.localScale = legacyTransform.lossyScale;
-
-        if (targetTransform is RectTransform targetRect && legacyTransform is RectTransform legacyRect)
-        {
-            targetRect.sizeDelta = legacyRect.sizeDelta;
-            targetRect.pivot = legacyRect.pivot;
-        }
-    }
-
-    private static void ApplyScreenButtonTransform(Transform targetTransform, ScreenButtonPlacement placement, Transform screenTransform)
-    {
-        if (targetTransform == null || screenTransform == null)
-            return;
-
-        Vector3 worldPosition = placement.WorldPosition;
-        Quaternion worldRotation = Quaternion.Euler(placement.WorldEulerAngles);
-        targetTransform.SetPositionAndRotation(worldPosition, worldRotation);
-    }
-
-
-    private static void SetLegacyButtonHidden(Transform legacyTransform)
-    {
-        if (legacyTransform == null)
-            return;
-
-        if (legacyTransform.gameObject.activeSelf)
-            legacyTransform.gameObject.SetActive(false);
+        targetTransform.SetPositionAndRotation(worldPosition, s_screenButtonWorldRotation);
     }
 
     private void HandleRoleSelectButtonClicked()
@@ -759,6 +679,5 @@ public class LobbyScene : BaseScene
 
         _localLobbyCamera = null;
         _screenHostStartButton = null;
-        _screenTransform = null;
     }
 }

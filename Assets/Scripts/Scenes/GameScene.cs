@@ -55,22 +55,9 @@ public class GameScene : BaseScene
         Debug.Log($"{InputDebug.Prefix} GameScene.Init SceneType={SceneType}");
 
         LoadManagers();
-
-        EnsureFloorCollision();
         EnsureTitanRuntime();
         CleanupLobbyRangers();
         Managers.Input.SetMode(Define.InputMode.Player);
-    }
-
-    private void EnsureFloorCollision()
-    {
-        // Plane floor collision should be authored in the scene (static setup).
-        GameObject plane = GameObject.Find("Plane");
-        if (plane == null)
-            return;
-
-        if (plane.GetComponent<BoxCollider>() == null)
-            Debug.LogError($"{InputDebug.Prefix} Plane is missing BoxCollider. Add it to Game.unity for stable collision.");
     }
 
     private static void CleanupLobbyRangers()
