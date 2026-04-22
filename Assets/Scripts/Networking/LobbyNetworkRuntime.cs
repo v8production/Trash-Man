@@ -66,7 +66,11 @@ public static class LobbyNetworkRuntime
             networkManager.NetworkConfig.Prefabs = new NetworkPrefabs();
 
         networkManager.NetworkConfig.NetworkTransport = transport;
-        networkManager.NetworkConfig.EnableSceneManagement = true;
+        // The lobby is entered via plain Unity scene loads before NGO connects host/client.
+        // Keeping NGO scene management enabled here can block client synchronization/player spawn
+        // until a disconnect/promotion cycle occurs. GameScene already has a manual ClientRpc fallback,
+        // so the lobby runtime should stay out of NGO scene synchronization.
+        networkManager.NetworkConfig.EnableSceneManagement = false;
         networkManager.NetworkConfig.ConnectionApproval = false;
         networkManager.NetworkConfig.ForceSamePrefabs = false;
         networkManager.NetworkConfig.PlayerPrefab = playerPrefab;
