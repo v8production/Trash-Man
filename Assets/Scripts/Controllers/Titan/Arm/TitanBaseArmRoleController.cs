@@ -70,7 +70,7 @@ public abstract class TitanBaseArmRoleController : TitanBaseController
         state.ShoulderYaw = Mathf.Lerp(state.ShoulderYaw, targetYaw, blend);
         state.ShoulderPitch = Mathf.Lerp(state.ShoulderPitch, targetPitch, blend);
 
-        float elbowInput = IsLeftArm ? input.LeftArmElbow : input.RightArmElbow;
+        float elbowInput = IsLeftArm ? input.LeftArmElbow : -input.RightArmElbow;
 
         state.ShoulderPitch = Mathf.Clamp(state.ShoulderPitch, shoulderPitchLimit.x, shoulderPitchLimit.y);
         state.ShoulderYaw = Mathf.Clamp(state.ShoulderYaw, shoulderYawLimit.x, shoulderYawLimit.y);

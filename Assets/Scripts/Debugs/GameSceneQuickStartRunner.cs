@@ -1,0 +1,130 @@
+using System.Collections;
+using Unity.Netcode;
+using Unity.Netcode.Transports.UTP;
+using UnityEngine;
+
+public class GameSceneQuickStartRunner : MonoBehaviour
+{
+    [SerializeField] private bool _runOnStart = true;
+    [SerializeField] private bool _editorOnly = true;
+    [SerializeField] private string _hostAddress = "127.0.0.1";
+    [SerializeField] private ushort _port = 18000;
+    [SerializeField] private float _initialDelaySeconds = 0.1f;
+    [SerializeField] private float _retryIntervalSeconds = 0.1f;
+    [SerializeField] private int _maxRetryCount = 40;
+    [SerializeField] private bool _verboseLog = true;
+
+    private bool _started;
+
+    private void Start()
+    {
+        if (!_runOnStart || _started)
+            return;
+
+        _started = true;
+        StartCoroutine(RunQuickStartCoroutine());
+    }
+
+    private IEnumerator RunQuickStartCoroutine()
+    {
+        if (_editorOnly && !Application.isEditor)
+            yield break;
+
+        if (_initialDelaySeconds > 0f)
+            yield return new WaitForSecondsRealtime(_initialDelaySeconds);
+
+        int retryCount = Mathf.Max(1, _maxRetryCount);
+        for (int attempt = 1; attempt <= retryCount; attempt++)
+        {
+            if (!LobbyNetworkRuntime.EnsureSetup(out NetworkManager networkManager, out UnityTransport transport)
+                || networkManager == null
+                || transport == null)
+            {
+                yield return WaitRetry();
+                continue;
+            }
+
+            if (!EnsureHostStarted(networkManager, transport, attempt))
+            {
+                yield return WaitRetry();
+                continue;
+            }
+
+            LobbyNetworkPlayer localPlayer = LobbyNetworkPlayer.FindLocalOwnedPlayer();
+            if (localPlayer == null || !localPlayer.IsSpawned)
+            {
+                yield return WaitRetry();
+                continue;
+            }
+
+            EnsureAllRolesSelected(localPlayer);
+
+            if (HasAllRoles(localPlayer))
+            {
+                Log($"Quick start ready. clientId={localPlayer.OwnerClientId}, selectedMask=0x{localPlayer.SelectedTitanRoleMaskValue:X}");
+                yield break;
+            }
+
+            yield return WaitRetry();
+        }
+
+        Debug.LogWarning("[GameQuickStart] Failed to prepare local host and five-role assignment within retry limit.");
+    }
+
+    private bool EnsureHostStarted(NetworkManager networkManager, UnityTransport transport, int attempt)
+    {
+        if (networkManager.IsListening)
+        {
+            if (networkManager.IsHost)
+                return true;
+
+            networkManager.Shutdown();
+            Log($"Restarting runtime as host. attempt={attempt}");
+            return false;
+        }
+
+        string host = string.IsNullOrWhiteSpace(_hostAddress) ? "127.0.0.1" : _hostAddress.Trim();
+        transport.SetConnectionData(host, _port);
+
+        bool started = networkManager.StartHost();
+        Log($"StartHost requested. attempt={attempt}, started={started}, host={host}, port={_port}");
+        return started;
+    }
+
+    private void EnsureAllRolesSelected(LobbyNetworkPlayer localPlayer)
+    {
+        SelectRoleIfMissing(localPlayer, Define.TitanRole.Body);
+        SelectRoleIfMissing(localPlayer, Define.TitanRole.LeftArm);
+        SelectRoleIfMissing(localPlayer, Define.TitanRole.RightArm);
+        SelectRoleIfMissing(localPlayer, Define.TitanRole.LeftLeg);
+        SelectRoleIfMissing(localPlayer, Define.TitanRole.RightLeg);
+    }
+
+    private static void SelectRoleIfMissing(LobbyNetworkPlayer localPlayer, Define.TitanRole role)
+    {
+        if (localPlayer.HasSelectedTitanRoleValue(role))
+            return;
+
+        localPlayer.ToggleTitanRoleSelection(role);
+    }
+
+    private static bool HasAllRoles(LobbyNetworkPlayer localPlayer)
+    {
+        return localPlayer.HasSelectedTitanRoleValue(Define.TitanRole.Body)
+            && localPlayer.HasSelectedTitanRoleValue(Define.TitanRole.LeftArm)
+            && localPlayer.HasSelectedTitanRoleValue(Define.TitanRole.RightArm)
+            && localPlayer.HasSelectedTitanRoleValue(Define.TitanRole.LeftLeg)
+            && localPlayer.HasSelectedTitanRoleValue(Define.TitanRole.RightLeg);
+    }
+
+    private CustomYieldInstruction WaitRetry()
+    {
+        return new WaitForSecondsRealtime(Mathf.Max(0.02f, _retryIntervalSeconds));
+    }
+
+    private void Log(string message)
+    {
+        if (_verboseLog)
+            Debug.Log($"[GameQuickStart] {message}");
+    }
+}
