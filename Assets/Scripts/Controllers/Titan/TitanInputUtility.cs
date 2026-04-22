@@ -3,6 +3,11 @@ using UnityEngine.InputSystem;
 
 public static class TitanInputUtility
 {
+    private static bool s_hasVirtualMousePosition;
+    private static Vector2 s_virtualMousePosition;
+    private static Vector2Int s_virtualMouseScreenSize;
+    private static CursorLockMode s_lastCursorLockMode;
+
     public static Vector2 KeepDominantAxis(Vector2 value, float deadZone = 0.01f)
     {
         float absX = Mathf.Abs(value.x);
@@ -46,9 +51,34 @@ public static class TitanInputUtility
 
     public static Vector2 ReadMousePosition()
     {
-        return Mouse.current != null
-            ? Mouse.current.position.ReadValue()
-            : Vector2.zero;
+        Mouse mouse = Mouse.current;
+        if (mouse == null)
+            return Vector2.zero;
+
+        // When the cursor is locked in the editor/build, Mouse.position is typically pinned (often to screen center).
+        // Our Titan limb mapping expects a moving screen-space pointer, so we synthesize a virtual position from delta.
+        if (Cursor.lockState != CursorLockMode.Locked)
+        {
+            s_hasVirtualMousePosition = false;
+            s_lastCursorLockMode = Cursor.lockState;
+            return mouse.position.ReadValue();
+        }
+
+        Vector2Int screenSize = new(Screen.width, Screen.height);
+        if (!s_hasVirtualMousePosition
+            || s_virtualMouseScreenSize != screenSize
+            || s_lastCursorLockMode != CursorLockMode.Locked)
+        {
+            s_virtualMousePosition = new Vector2(screenSize.x * 0.5f, screenSize.y * 0.5f);
+            s_virtualMouseScreenSize = screenSize;
+            s_hasVirtualMousePosition = true;
+        }
+
+        s_virtualMousePosition += mouse.delta.ReadValue();
+        s_virtualMousePosition.x = Mathf.Clamp(s_virtualMousePosition.x, 0f, screenSize.x);
+        s_virtualMousePosition.y = Mathf.Clamp(s_virtualMousePosition.y, 0f, screenSize.y);
+        s_lastCursorLockMode = CursorLockMode.Locked;
+        return s_virtualMousePosition;
     }
 
     public static float GetAxis(

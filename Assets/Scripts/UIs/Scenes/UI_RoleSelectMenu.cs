@@ -58,7 +58,6 @@ public class UI_RoleSelectMenu : UI_Scene
         GetButton((int)Buttons.LeftLeg).gameObject.BindEvent(_ => NotifyRoleSelected(Define.TitanRole.LeftLeg));
         GetButton((int)Buttons.RightLeg).gameObject.BindEvent(_ => NotifyRoleSelected(Define.TitanRole.RightLeg));
 
-        gameObject.SetActive(false);
         _isInitialized = true;
     }
 

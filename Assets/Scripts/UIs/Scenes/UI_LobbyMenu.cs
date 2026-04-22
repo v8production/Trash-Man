@@ -46,7 +46,6 @@ public class UI_LobbyMenu : UI_Scene
         GetButton((int)Buttons.QuitRoom).gameObject.BindEvent(OnQuitRoomButtonClicked);
 
         ApplyJoinCodeState();
-        gameObject.SetActive(false);
     }
 
     private void OnDestroy()

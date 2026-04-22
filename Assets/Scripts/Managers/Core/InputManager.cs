@@ -32,6 +32,9 @@ public class InputManager
         {
             case Define.InputMode.Player:
                 PlayerMap.Enable();
+                // Keep UI map enabled so the first UI interaction after a mode switch
+                // (e.g., opening a menu then clicking immediately) is not dropped.
+                UIMap.Enable();
                 Cursor.lockState = CursorLockMode.Locked;
                 Cursor.visible = false;
                 break;

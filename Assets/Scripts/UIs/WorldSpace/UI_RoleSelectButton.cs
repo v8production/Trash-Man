@@ -153,6 +153,14 @@ public class UI_RoleSelectButton : UI_Base, ILobbyWorldButtonInteractionTarget
 
     private void NotifyRoleSelectButtonClicked()
     {
+        // When UI action map is enabled, the Unity Button can be clicked via EventSystem.
+        // Preserve the intended proximity interaction rule.
+        if (!_isInteractableByProximity)
+            return;
+
+        if (!LobbyWorldButtonInteractionRegistry.IsClosestAvailable(this))
+            return;
+
         RoleSelectButtonClicked?.Invoke();
     }
 

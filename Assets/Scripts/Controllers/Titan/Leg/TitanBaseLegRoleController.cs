@@ -18,6 +18,9 @@ public abstract class TitanBaseLegRoleController : TitanBaseController
     [SerializeField] private Vector2 hipRollLimit = new(-90f, 45f);
     [SerializeField] private Vector2 kneeRollLimit = new(-5f, 125f);
 
+    [Header("Idle Return")]
+    [SerializeField] private float idleReturnSpeed = 12f;
+
     protected abstract bool IsLeftLeg { get; }
 
     public override void TickRoleInput(float deltaTime)
@@ -65,6 +68,28 @@ public abstract class TitanBaseLegRoleController : TitanBaseController
             state.KneeRoll + (kneeInput * kneeSpeed * deltaTime),
             kneeRollLimit.x,
             kneeRollLimit.y);
+
+        Managers.TitanRig.SetLegState(left: IsLeftLeg, state);
+        Managers.TitanRig.ApplyLegPose(left: IsLeftLeg);
+    }
+
+    public void TickIdle(float deltaTime)
+    {
+        if (!Managers.TitanRig.EnsureReady())
+        {
+            return;
+        }
+
+        TitanLegControlState state = Managers.TitanRig.GetLegState(left: IsLeftLeg);
+        float blend = 1f - Mathf.Exp(-idleReturnSpeed * deltaTime);
+
+        state.HipYaw = Mathf.Lerp(state.HipYaw, 0f, blend);
+        state.HipRoll = Mathf.Lerp(state.HipRoll, 0f, blend);
+        state.KneeRoll = Mathf.Lerp(state.KneeRoll, 0f, blend);
+
+        state.HipYaw = Mathf.Clamp(state.HipYaw, hipYawLimit.x, hipYawLimit.y);
+        state.HipRoll = Mathf.Clamp(state.HipRoll, hipRollLimit.x, hipRollLimit.y);
+        state.KneeRoll = Mathf.Clamp(state.KneeRoll, kneeRollLimit.x, kneeRollLimit.y);
 
         Managers.TitanRig.SetLegState(left: IsLeftLeg, state);
         Managers.TitanRig.ApplyLegPose(left: IsLeftLeg);

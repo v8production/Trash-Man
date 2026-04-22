@@ -75,7 +75,14 @@ public class TitanRoleNetworkDriver : MonoBehaviour
         // if (_shouldLogThisFrame)
         //     InputDebug.Log($"TickRole {role} ok={ok} input(ws={input.LeftArmElbow}, mouse={input.MousePosition})");
 
-        controller.TickRoleInput(dt);
+        if (ok)
+        {
+            controller.TickRoleInput(dt);
+        }
+        else
+        {
+            controller.TickIdle(dt);
+        }
     }
 
     private void TickLegRole(bool left, float dt)
@@ -91,7 +98,14 @@ public class TitanRoleNetworkDriver : MonoBehaviour
         // if (_shouldLogThisFrame)
         //     InputDebug.Log($"TickRole {role} ok={ok} input(ws={input.LeftArmElbow}, mouse={input.MousePosition})");
 
-        controller.TickRoleInput(dt);
+        if (ok)
+        {
+            controller.TickRoleInput(dt);
+        }
+        else
+        {
+            controller.TickIdle(dt);
+        }
     }
 
     private void ResolveControllers()
