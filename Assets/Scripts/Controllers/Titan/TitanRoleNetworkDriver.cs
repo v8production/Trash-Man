@@ -79,10 +79,6 @@ public class TitanRoleNetworkDriver : MonoBehaviour
         {
             controller.TickRoleInput(dt);
         }
-        else
-        {
-            controller.TickIdle(dt);
-        }
     }
 
     private void TickLegRole(bool left, float dt)
@@ -101,10 +97,6 @@ public class TitanRoleNetworkDriver : MonoBehaviour
         if (ok)
         {
             controller.TickRoleInput(dt);
-        }
-        else
-        {
-            controller.TickIdle(dt);
         }
     }
 
