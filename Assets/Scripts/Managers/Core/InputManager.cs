@@ -16,7 +16,7 @@ public class InputManager
     private const bool UseTitanSingleAxisCorrection = false;
     private const float TitanSingleAxisDeadZonePixels = 2f;
     private const float TitanHorizontalAssistBiasPixels = 18f;
-    private const float TitanMouseSensitivity = 0.0000035f;
+    private const float TitanMouseSensitivity = 5f;
 
     public Define.InputMode Mode { get; private set; } = Define.InputMode.Player;
 
@@ -76,6 +76,7 @@ public class InputManager
     {
         TitanAggregatedInput input = default;
 
+        input.MouseDelta = ReadTitanMouseDelta();
         input.MousePosition = ReadMousePosition();
         input.MousePosition = CorrectTitanMousePosition(input.MousePosition);
         input.BodyForward = GetAxis(Key.UpArrow, Key.DownArrow);
@@ -91,6 +92,15 @@ public class InputManager
 
         MaybeLogTitanInput(input);
         return input;
+    }
+
+    public Vector2 ReadTitanMouseDelta()
+    {
+        Mouse mouse = Mouse.current;
+        if (mouse == null)
+            return Vector2.zero;
+
+        return mouse.delta.ReadValue();
     }
 
     public Vector2 ReadPlayerLookInput()

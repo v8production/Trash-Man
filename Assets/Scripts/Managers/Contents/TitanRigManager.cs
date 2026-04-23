@@ -232,7 +232,7 @@ public struct TitanRigPoseSnapshot
 [System.Serializable]
 public struct TitanArmControlState
 {
-    public float ShoulderYaw;
+    public float ShoulderRoll;
     public float ShoulderPitch;
     public float ElbowPitch;
 }

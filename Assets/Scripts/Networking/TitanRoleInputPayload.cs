@@ -6,6 +6,8 @@ public struct TitanRoleInputPayload : INetworkSerializable, IEquatable<TitanRole
 {
     public float MouseX;
     public float MouseY;
+    public float MouseDeltaX;
+    public float MouseDeltaY;
 
     public float BodyForward;
     public float BodyStrafe;
@@ -21,6 +23,8 @@ public struct TitanRoleInputPayload : INetworkSerializable, IEquatable<TitanRole
     {
         MouseX = input.MousePosition.x;
         MouseY = input.MousePosition.y;
+        MouseDeltaX = input.MouseDelta.x;
+        MouseDeltaY = input.MouseDelta.y;
         BodyForward = input.BodyForward;
         BodyStrafe = input.BodyStrafe;
         BodyTurn = input.BodyTurn;
@@ -36,6 +40,7 @@ public struct TitanRoleInputPayload : INetworkSerializable, IEquatable<TitanRole
         return new TitanAggregatedInput
         {
             MousePosition = new Vector2(MouseX, MouseY),
+            MouseDelta = new Vector2(MouseDeltaX, MouseDeltaY),
             BodyForward = BodyForward,
             BodyStrafe = BodyStrafe,
             BodyTurn = BodyTurn,
@@ -51,6 +56,8 @@ public struct TitanRoleInputPayload : INetworkSerializable, IEquatable<TitanRole
     {
         serializer.SerializeValue(ref MouseX);
         serializer.SerializeValue(ref MouseY);
+        serializer.SerializeValue(ref MouseDeltaX);
+        serializer.SerializeValue(ref MouseDeltaY);
         serializer.SerializeValue(ref BodyForward);
         serializer.SerializeValue(ref BodyStrafe);
         serializer.SerializeValue(ref BodyTurn);
@@ -65,6 +72,8 @@ public struct TitanRoleInputPayload : INetworkSerializable, IEquatable<TitanRole
     {
         return MouseX.Equals(other.MouseX)
             && MouseY.Equals(other.MouseY)
+            && MouseDeltaX.Equals(other.MouseDeltaX)
+            && MouseDeltaY.Equals(other.MouseDeltaY)
             && BodyForward.Equals(other.BodyForward)
             && BodyStrafe.Equals(other.BodyStrafe)
             && BodyTurn.Equals(other.BodyTurn)

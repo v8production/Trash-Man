@@ -23,6 +23,7 @@ public abstract class TitanBaseLegRoleController : TitanBaseController
     public override void TickRoleInput(in TitanAggregatedInput input, float deltaTime)
     {
         Vector2 mousePosition = input.MousePosition;
+        float sensitivity = Managers.Input.GetTitanMouseSensitivity();
         Vector2 origin = useScreenCenterAsOrigin
             ? new Vector2(Screen.width * 0.5f, Screen.height * 0.5f)
             : mouseOriginPixels;
@@ -32,9 +33,9 @@ public abstract class TitanBaseLegRoleController : TitanBaseController
             origin,
             thetaRadiusPixels,
             maxThetaDegrees,
-            Managers.Input.GetTitanMouseSensitivity(),
+            sensitivity,
             secondaryMaxDegrees: Mathf.Max(Mathf.Abs(hipRollLimit.x), Mathf.Abs(hipRollLimit.y)),
-            applySensitivityToSecondary: false);
+            applySensitivityToSecondary: true);
 
         float targetYaw = targetAngles.x;
         float targetRoll = targetAngles.y;

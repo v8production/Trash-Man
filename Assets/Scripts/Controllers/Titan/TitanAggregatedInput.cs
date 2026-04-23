@@ -4,6 +4,7 @@ using UnityEngine;
 public struct TitanAggregatedInput
 {
     public Vector2 MousePosition;
+    public Vector2 MouseDelta;
 
     public float BodyForward;
     public float BodyStrafe;

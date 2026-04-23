@@ -160,11 +160,11 @@ public sealed class TitanRigRuntime : MonoBehaviour
         TitanArmControlState state = left ? leftArm : rightArm;
         if (left)
         {
-            ApplyLeftArm(state.ShoulderPitch, state.ShoulderYaw, state.ElbowPitch);
+            ApplyLeftArm(state.ShoulderPitch, state.ShoulderRoll, state.ElbowPitch);
             return;
         }
 
-        ApplyRightArm(state.ShoulderPitch, state.ShoulderYaw, state.ElbowPitch);
+        ApplyRightArm(state.ShoulderPitch, state.ShoulderRoll, state.ElbowPitch);
     }
 
     public void ApplyLegPose(bool left)
@@ -184,11 +184,11 @@ public sealed class TitanRigRuntime : MonoBehaviour
         ApplyRightLeg(state.HipYaw, state.HipRoll, state.KneeRoll);
     }
 
-    public void ApplyLeftArm(float shoulderPitch, float shoulderYaw, float elbowPitch)
+    public void ApplyLeftArm(float shoulderPitch, float shoulderRoll, float elbowPitch)
     {
         if (leftShoulder != null)
         {
-            leftShoulder.localRotation = leftShoulderBaseRotation * Quaternion.Euler(shoulderPitch, 0f, shoulderYaw);
+            leftShoulder.localRotation = ComposeShoulderRotation(leftShoulderBaseRotation, shoulderPitch, shoulderRoll);
         }
 
         if (leftElbow != null)
@@ -197,11 +197,11 @@ public sealed class TitanRigRuntime : MonoBehaviour
         }
     }
 
-    public void ApplyRightArm(float shoulderPitch, float shoulderYaw, float elbowPitch)
+    public void ApplyRightArm(float shoulderPitch, float shoulderRoll, float elbowPitch)
     {
         if (rightShoulder != null)
         {
-            rightShoulder.localRotation = rightShoulderBaseRotation * Quaternion.Euler(shoulderPitch, 0f, shoulderYaw);
+            rightShoulder.localRotation = ComposeShoulderRotation(rightShoulderBaseRotation, shoulderPitch, shoulderRoll);
         }
 
         if (rightElbow != null)
@@ -242,6 +242,13 @@ public sealed class TitanRigRuntime : MonoBehaviour
         {
             spine.localRotation = spineBaseRotation * Quaternion.Euler(pitch, yaw, roll);
         }
+    }
+
+    private static Quaternion ComposeShoulderRotation(Quaternion baseRotation, float shoulderPitch, float shoulderRoll)
+    {
+        Quaternion rollRotation = Quaternion.AngleAxis(shoulderRoll, Vector3.forward);
+        Quaternion pitchRotation = Quaternion.AngleAxis(shoulderPitch, Vector3.right);
+        return baseRotation * rollRotation * pitchRotation;
     }
 
     public bool TryGetPoseSnapshot(out TitanRigPoseSnapshot snapshot)
