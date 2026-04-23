@@ -135,7 +135,7 @@ PrefabInstance:
       addedObject: {fileID: 8564592351487505217}
     - targetCorrespondingSourceObject: {fileID: -2588451870375243192, guid: 7bd5342e1d2f38c4d823edf668badc2a, type: 3}
       insertIndex: -1
-      addedObject: {fileID: 4521330188332452375}
+      addedObject: {fileID: 7854387019838947216}
     - targetCorrespondingSourceObject: {fileID: -2555734329826457467, guid: 7bd5342e1d2f38c4d823edf668badc2a, type: 3}
       insertIndex: -1
       addedObject: {fileID: 5830624450030693499}
@@ -144,7 +144,7 @@ PrefabInstance:
       addedObject: {fileID: 8341442599993174617}
     - targetCorrespondingSourceObject: {fileID: 7233488056244659159, guid: 7bd5342e1d2f38c4d823edf668badc2a, type: 3}
       insertIndex: -1
-      addedObject: {fileID: 8620208953508902017}
+      addedObject: {fileID: 5286655672172749005}
   m_SourcePrefab: {fileID: 100100000, guid: 7bd5342e1d2f38c4d823edf668badc2a, type: 3}
 --- !u!1 &375693337107493120 stripped
 GameObject:
@@ -179,8 +179,8 @@ GameObject:
   m_CorrespondingSourceObject: {fileID: -2588451870375243192, guid: 7bd5342e1d2f38c4d823edf668badc2a, type: 3}
   m_PrefabInstance: {fileID: 5778304239401060129}
   m_PrefabAsset: {fileID: 0}
---- !u!136 &4521330188332452375
-CapsuleCollider:
+--- !u!65 &7854387019838947216
+BoxCollider:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
@@ -197,11 +197,9 @@ CapsuleCollider:
   m_IsTrigger: 0
   m_ProvidesContacts: 0
   m_Enabled: 1
-  serializedVersion: 2
-  m_Radius: 0.05
-  m_Height: 0.2
-  m_Direction: 1
-  m_Center: {x: -0.02, y: 0, z: 0}
+  serializedVersion: 3
+  m_Size: {x: 0.06, y: 0.15, z: 0.13}
+  m_Center: {x: -0.038, y: 0.01, z: 0}
 --- !u!1 &916654312993460132 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: -2555734329826457467, guid: 7bd5342e1d2f38c4d823edf668badc2a, type: 3}
@@ -283,8 +281,8 @@ GameObject:
   m_CorrespondingSourceObject: {fileID: 7233488056244659159, guid: 7bd5342e1d2f38c4d823edf668badc2a, type: 3}
   m_PrefabInstance: {fileID: 5778304239401060129}
   m_PrefabAsset: {fileID: 0}
---- !u!136 &8620208953508902017
-CapsuleCollider:
+--- !u!65 &5286655672172749005
+BoxCollider:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
@@ -301,11 +299,9 @@ CapsuleCollider:
   m_IsTrigger: 0
   m_ProvidesContacts: 0
   m_Enabled: 1
-  serializedVersion: 2
-  m_Radius: 0.05
-  m_Height: 0.2
-  m_Direction: 1
-  m_Center: {x: -0.02, y: 0, z: 0}
+  serializedVersion: 3
+  m_Size: {x: 0.06, y: 0.15, z: 0.13}
+  m_Center: {x: -0.038, y: 0.01, z: 0}
 --- !u!4 &4234910824637799797 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: -1516088123671684524, guid: 7bd5342e1d2f38c4d823edf668badc2a, type: 3}
@@ -485,9 +481,6 @@ MonoBehaviour:
   thetaRadiusPixels: 260
   useScreenCenterAsOrigin: 1
   mouseOriginPixels: {x: 960, y: 540}
-  useSingleAxisMouseAssist: 1
-  singleAxisDeadZonePixels: 2
-  horizontalAssistBiasPixels: 18
   mouseSensitivity: 0.35
   mouseResponseSpeed: 5
   elbowSpeed: 120
@@ -512,9 +505,6 @@ MonoBehaviour:
   thetaRadiusPixels: 260
   useScreenCenterAsOrigin: 1
   mouseOriginPixels: {x: 960, y: 540}
-  useSingleAxisMouseAssist: 1
-  singleAxisDeadZonePixels: 2
-  horizontalAssistBiasPixels: 18
   mouseSensitivity: 0.35
   mouseResponseSpeed: 5
   elbowSpeed: 120
@@ -539,8 +529,6 @@ MonoBehaviour:
   thetaRadiusPixels: 260
   useScreenCenterAsOrigin: 1
   mouseOriginPixels: {x: 960, y: 540}
-  useSingleAxisMouseAssist: 1
-  singleAxisDeadZonePixels: 2
   mouseSensitivity: 0.35
   mouseResponseSpeed: 12
   kneeSpeed: 110
@@ -564,8 +552,6 @@ MonoBehaviour:
   thetaRadiusPixels: 260
   useScreenCenterAsOrigin: 1
   mouseOriginPixels: {x: 960, y: 540}
-  useSingleAxisMouseAssist: 1
-  singleAxisDeadZonePixels: 2
   mouseSensitivity: 0.35
   mouseResponseSpeed: 12
   kneeSpeed: 110

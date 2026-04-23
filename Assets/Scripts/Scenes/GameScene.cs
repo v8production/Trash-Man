@@ -3,6 +3,9 @@ using UnityEngine;
 public class GameScene : BaseScene
 {
     private const string TitanPrefabName = "Titan";
+    private const string GrolarPrefabName = "Grolar";
+    private static readonly Vector3 GrolarSpawnPosition = new(-0.489070356f, 7.18142701e-09f, 1.08038938f);
+    private static readonly Quaternion GrolarSpawnRotation = Quaternion.Euler(0f, 180f, 0f);
     private TitanController _titanController;
     private TitanRoleNetworkDriver _titanRoleDriver;
 
@@ -47,6 +50,25 @@ public class GameScene : BaseScene
         }
     }
 
+    private static void EnsureGrolarRuntime()
+    {
+        GrolarController grolarController = FindAnyObjectByType<GrolarController>();
+        if (grolarController != null)
+            return;
+
+        GameObject grolarObject = GameObject.Find(GrolarPrefabName);
+        if (grolarObject == null)
+            grolarObject = Managers.Resource.Instantiate(GrolarPrefabName);
+
+        if (grolarObject == null)
+        {
+            Debug.LogError($"{InputDebug.Prefix} Failed to load Grolar prefab from Resources/Prefabs/Grolar.prefab");
+            return;
+        }
+
+        grolarObject.transform.SetPositionAndRotation(GrolarSpawnPosition, GrolarSpawnRotation);
+    }
+
     protected override void Init()
     {
         base.Init();
@@ -56,6 +78,7 @@ public class GameScene : BaseScene
 
         LoadManagers();
         EnsureTitanRuntime();
+        EnsureGrolarRuntime();
         CleanupLobbyRangers();
         Managers.Input.SetMode(Define.InputMode.Player);
     }
