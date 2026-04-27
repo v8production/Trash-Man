@@ -3,10 +3,11 @@ using UnityEngine;
 
 public class SteamManager
 {
-    private const uint AppId = 480; // 개발 중 Spacewar. 출시 전 실제 AppID로 교체.
+    private const uint AppId = 480;
     private bool _initialized;
 
     public bool IsInitialized => _initialized;
+    public string LastInitError { get; private set; } = string.Empty;
     public CSteamID LocalSteamId => _initialized ? SteamUser.GetSteamID() : CSteamID.Nil;
 
     public void Init()
@@ -14,11 +15,24 @@ public class SteamManager
         if (_initialized)
             return;
 
+        LastInitError = string.Empty;
+
         try
         {
-            if (!SteamAPI.Init())
+            if (SteamAPI.RestartAppIfNecessary((AppId_t)AppId))
             {
-                Debug.LogWarning("[Steam] SteamAPI.Init failed. Is Steam client running?");
+                LastInitError = $"Steam requested app restart. appId={AppId}";
+                Debug.LogWarning($"[Steam] {LastInitError}");
+                return;
+            }
+
+            string errMsg;
+            ESteamAPIInitResult result = SteamAPI.InitEx(out errMsg);
+
+            if (result != ESteamAPIInitResult.k_ESteamAPIInitResult_OK)
+            {
+                LastInitError = $"SteamAPI.InitEx failed. result={result}, message={errMsg}";
+                Debug.LogWarning($"[Steam] {LastInitError}");
                 return;
             }
 
@@ -29,6 +43,7 @@ public class SteamManager
         }
         catch (System.Exception e)
         {
+            LastInitError = e.ToString();
             Debug.LogError($"[Steam] Init failed: {e}");
             _initialized = false;
         }

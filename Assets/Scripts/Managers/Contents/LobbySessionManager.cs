@@ -254,7 +254,9 @@ public class LobbySessionManager
 
         if (!Managers.Steam.IsInitialized)
         {
-            Debug.LogWarning("[Lobby] Host bootstrap failed: Steam is not initialized."); Managers.Toast.EnqueueMessage("Steam is not initialized.\nOpen Steam and check steam_appid.txt.", 3f);
+            Managers.Toast.EnqueueMessage(
+    $"Steam is not initialized.\n{Managers.Steam.LastInitError}",
+    3f);
             return;
         }
 
