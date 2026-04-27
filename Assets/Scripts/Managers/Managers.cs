@@ -31,6 +31,7 @@ public class Managers : MonoBehaviour
     SoundManager _soundManager = new();
     UIManager _uiManager = new();
     DiscordManager _discordManager = new();
+    RelayConnectionManager _relayConnection = new();
     public static DataManager Data { get { return Instance._dataManager; } }
     public static InputManager Input { get { return Instance._inputManager; } }
     public static PoolManager Pool { get { return Instance._poolManager; } }
@@ -39,6 +40,7 @@ public class Managers : MonoBehaviour
     public static SoundManager Sound { get { return Instance._soundManager; } }
     public static UIManager UI { get { return Instance._uiManager; } }
     public static DiscordManager Discord { get { return Instance._discordManager; } }
+    public static RelayConnectionManager RelayConnection { get { return Instance._relayConnection; } }
     #endregion
 
     void Start()
