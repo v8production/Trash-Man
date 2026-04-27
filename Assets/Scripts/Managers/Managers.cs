@@ -48,15 +48,6 @@ public class Managers : MonoBehaviour
         Init();
     }
 
-    void Update()
-    {
-        Chat.OnUpdate();
-        Toast.OnUpdate();
-        LobbySession.OnUpdate();
-        Discord.OnUpdate();
-        Steam.OnUpdate();
-    }
-
     static void Init()
     {
         if (_instance == null)
@@ -87,6 +78,20 @@ public class Managers : MonoBehaviour
         }
     }
 
+    void Update()
+    {
+        Chat.OnUpdate();
+        Toast.OnUpdate();
+        LobbySession.OnUpdate();
+        Discord.OnUpdate();
+        Steam.OnUpdate();
+    }
+
+    private void OnApplicationQuit()
+    {
+        Shutdown();
+    }
+
     public static void Clear()
     {
         Sound.Clear();
@@ -101,7 +106,12 @@ public class Managers : MonoBehaviour
         Pool.Clear();
         TitanRig.Clear();
         TitanRole.Clear();
-        Discord.Clear();
+        // Discord.Clear();
+        // Steam.Clear();
+    }
+    public static void Shutdown()
+    {
         Steam.Clear();
+        Discord.Clear();
     }
 }
