@@ -1,5 +1,67 @@
 %YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
+--- !u!1 &1418939623133382914
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 2576084941873172364}
+  m_Layer: 0
+  m_Name: RightFootAttachProbe
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &2576084941873172364
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1418939623133382914}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: -0.058002688, y: 0.00999968, z: -0.00000043667387}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 4006448067675433985}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &4642654408900018847
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 7994426978885428570}
+  m_Layer: 0
+  m_Name: LeftFootAttachProbe
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &7994426978885428570
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4642654408900018847}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: -0.058002464, y: 0.010000192, z: -0.0000017359853}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 6989488937968845983}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1001 &5778304239401060129
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -98,7 +160,13 @@ PrefabInstance:
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
-    m_AddedGameObjects: []
+    m_AddedGameObjects:
+    - targetCorrespondingSourceObject: {fileID: -5706326537154493506, guid: 7bd5342e1d2f38c4d823edf668badc2a, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 7994426978885428570}
+    - targetCorrespondingSourceObject: {fileID: 7469618404995525408, guid: 7bd5342e1d2f38c4d823edf668badc2a, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 2576084941873172364}
     m_AddedComponents:
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 7bd5342e1d2f38c4d823edf668badc2a, type: 3}
       insertIndex: -1
@@ -127,6 +195,15 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 7bd5342e1d2f38c4d823edf668badc2a, type: 3}
       insertIndex: -1
       addedObject: {fileID: 3344556677889901007}
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 7bd5342e1d2f38c4d823edf668badc2a, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 8941766507078927944}
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 7bd5342e1d2f38c4d823edf668badc2a, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 4379125399005193119}
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 7bd5342e1d2f38c4d823edf668badc2a, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 758194761437020032}
     - targetCorrespondingSourceObject: {fileID: -5490650071928370707, guid: 7bd5342e1d2f38c4d823edf668badc2a, type: 3}
       insertIndex: -1
       addedObject: {fileID: 2649589596825960184}
@@ -375,6 +452,11 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 0.15, y: 0.03, z: 0.15}
   m_Center: {x: -0.02, y: -0.012, z: 0}
+--- !u!4 &4006448067675433985 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 7469618404995525408, guid: 7bd5342e1d2f38c4d823edf668badc2a, type: 3}
+  m_PrefabInstance: {fileID: 5778304239401060129}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1 &4013145239885282533 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 7458285622571776964, guid: 7bd5342e1d2f38c4d823edf668badc2a, type: 3}
@@ -488,6 +570,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::TitanController
   attachControllersOnAwake: 1
   rigRuntime: {fileID: 3344556677889901002}
+  legAnchorResolver: {fileID: 8941766507078927944}
   bodyController: {fileID: 3344556677889901003}
   leftArmController: {fileID: 3344556677889901004}
   rightArmController: {fileID: 3344556677889901005}
@@ -506,6 +589,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::TitanRoleNetworkDriver
   _bodyController: {fileID: 3344556677889901003}
+  _legAnchorResolver: {fileID: 8941766507078927944}
   _leftArmController: {fileID: 3344556677889901004}
   _rightArmController: {fileID: 3344556677889901005}
   _leftLegController: {fileID: 3344556677889901006}
@@ -588,8 +672,8 @@ MonoBehaviour:
   dragTorqueScale: 0.03
   maxDragTorque: 160
   minDragSpeed: 0.75
-  leftFoot: {fileID: 0}
-  rightFoot: {fileID: 0}
+  leftFoot: {fileID: 6989488937968845983}
+  rightFoot: {fileID: 4006448067675433985}
 --- !u!114 &3344556677889901004
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -642,13 +726,14 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5ead31b4de2d97c4685766d42b8a2643, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::TitanLeftLegRoleController
+  legAnchorResolver: {fileID: 8941766507078927944}
   hipRadiusPixels: 260
   useScreenCenterAsOrigin: 1
   mouseOriginPixels: {x: 960, y: 540}
-  hipSpeed: 2
-  kneeSpeed: 110
   hipYawLimit: {x: -40, y: 40}
   hipRollLimit: {x: -90, y: 45}
+  hipSpeed: 2
+  kneeSpeed: 110
   kneeRollLimit: {x: -5, y: 125}
   idleReturnSpeed: 12
 --- !u!114 &3344556677889901007
@@ -663,18 +748,87 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 68f3bad04f0a451438fc898d3de6ec25, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::TitanRightLegRoleController
+  legAnchorResolver: {fileID: 8941766507078927944}
   hipRadiusPixels: 260
   useScreenCenterAsOrigin: 1
   mouseOriginPixels: {x: 960, y: 540}
-  hipSpeed: 2
-  kneeSpeed: 110
   hipYawLimit: {x: -40, y: 40}
   hipRollLimit: {x: -90, y: 45}
+  hipSpeed: 2
+  kneeSpeed: 110
   kneeRollLimit: {x: -5, y: 125}
   idleReturnSpeed: 12
+--- !u!114 &8941766507078927944
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6697346080426654320}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e1bd17e69197b5741a9b925eadeab0f0, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::TitanLegAnchorResolver
+  leftFootAttachment: {fileID: 4379125399005193119}
+  rightFootAttachment: {fileID: 758194761437020032}
+  inverseYawScale: 1
+  inverseRollScale: 0.75
+  inverseMouseDeltaTranslationScale: 0.0025
+  singleFootYawCorrectionScale: 1
+  zeroBodyVelocityWhenLocked: 1
+--- !u!114 &4379125399005193119
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6697346080426654320}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5fb8978dfc5afef4e9e326ac54985326, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::FootAttachmentController
+  side: 0
+  footTransform: {fileID: 6989488937968845983}
+  bottomProbe: {fileID: 7994426978885428570}
+  attachableGroundLayers:
+    serializedVersion: 2
+    m_Bits: 64
+  probeRadius: 0.08
+  probeDistance: 0.18
+  probeStartOffset: 0.05
+  drawDebugGizmos: 0
+--- !u!114 &758194761437020032
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6697346080426654320}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5fb8978dfc5afef4e9e326ac54985326, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::FootAttachmentController
+  side: 1
+  footTransform: {fileID: 4006448067675433985}
+  bottomProbe: {fileID: 2576084941873172364}
+  attachableGroundLayers:
+    serializedVersion: 2
+    m_Bits: 64
+  probeRadius: 0.08
+  probeDistance: 0.18
+  probeStartOffset: 0.05
+  drawDebugGizmos: 0
 --- !u!4 &6782418227976457030 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: -8201243596049249177, guid: 7bd5342e1d2f38c4d823edf668badc2a, type: 3}
+  m_PrefabInstance: {fileID: 5778304239401060129}
+  m_PrefabAsset: {fileID: 0}
+--- !u!4 &6989488937968845983 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: -5706326537154493506, guid: 7bd5342e1d2f38c4d823edf668badc2a, type: 3}
   m_PrefabInstance: {fileID: 5778304239401060129}
   m_PrefabAsset: {fileID: 0}
 --- !u!1 &7205165456609431244 stripped
