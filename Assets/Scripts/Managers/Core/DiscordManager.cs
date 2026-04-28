@@ -43,6 +43,7 @@ public class DiscordManager
     private Delegate _lobbyUpdatedCallback;
     private Delegate _lobbyMemberAddedCallback;
     private Delegate _lobbyMemberRemovedCallback;
+    private Delegate _endCallCallback;
     private Delegate _callSpeakingStatusChangedCallback;
     private Delegate _callVoiceStateChangedCallback;
     private string _pendingCodeVerifier = string.Empty;
@@ -228,7 +229,7 @@ public class DiscordManager
 
     public void RequestLobbyInvite(string joinCode)
     {
-        string normalizedCode = LobbySessionManager.NormalizeJoinCode(joinCode);
+        string normalizedCode = Util.NormalizeLobbyJoinCode(joinCode);
         if (string.IsNullOrWhiteSpace(normalizedCode))
         {
             Debug.LogWarning("[Lobby] Invite skipped: invalid join code.");
@@ -428,7 +429,6 @@ public class DiscordManager
 
         _voiceChatActiveByUserId[userId] = isActive;
         LogVoice($"Speaking state changed. userId={userId}, speaking={isActive}");
-        Managers.LobbySession.SetRangerNicknameVoiceActive(userId, isActive);
         OnLobbyUserVoiceChatStateChanged?.Invoke(userId, isActive);
     }
 
@@ -480,7 +480,10 @@ public class DiscordManager
         try
         {
             if (_client != null && _activeVoiceLobbyId != 0)
-                InvokeInstance(_client, "EndCall", _activeVoiceLobbyId, null);
+            {
+                _endCallCallback ??= CreateClientCallback("EndCallCallback", HandleEndCallBridge);
+                InvokeInstance(_client, "EndCall", _activeVoiceLobbyId, _endCallCallback);
+            }
         }
         catch
         {
@@ -491,6 +494,45 @@ public class DiscordManager
         _activeVoiceLobbySecret = string.Empty;
         _pendingVoiceLobbySecret = string.Empty;
         ResetAllLobbyVoiceChatStates();
+    }
+
+    public bool TryGetSessionLobbyMemberMetadata(ulong lobbyId, ulong memberId, out Dictionary<string, string> metadata)
+    {
+        metadata = null;
+        if (lobbyId == 0 || memberId == 0 || !EnsureClient())
+            return false;
+
+        object lobbyHandle = null;
+        object memberHandle = null;
+
+        try
+        {
+            lobbyHandle = InvokeInstance(_client, "GetLobbyHandle", lobbyId);
+            if (lobbyHandle == null)
+                return false;
+
+            memberHandle = InvokeInstance(lobbyHandle, "GetLobbyMemberHandle", memberId);
+            if (memberHandle == null)
+                return false;
+
+            object metadataObject = InvokeInstance(memberHandle, "Metadata");
+            return TryConvertMetadataObject(metadataObject, out metadata);
+        }
+        catch
+        {
+            return false;
+        }
+        finally
+        {
+            DisposeIfNeeded(memberHandle);
+            DisposeIfNeeded(lobbyHandle);
+        }
+    }
+
+    private void HandleEndCallBridge(object[] args)
+    {
+        object result = args.Length > 0 ? args[0] : null;
+        LogVoice($"EndCall callback received. success={IsSdkResultSuccessful(result)}");
     }
 
     private bool EnsureClient()

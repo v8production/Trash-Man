@@ -1,8 +1,19 @@
+using System;
 using UnityEngine;
 
 public class Util
 {
     private const ulong DiscordApplicationId = 1491669821924970607;
+    private const int LobbyJoinCodeLength = 6;
+
+    public static string NormalizeLobbyJoinCode(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return string.Empty;
+
+        string trimmed = value.Trim().ToUpperInvariant();
+        return trimmed.Length == LobbyJoinCodeLength ? trimmed : string.Empty;
+    }
 
     public static T GetorAddComponent<T>(GameObject go) where T : Component
     {

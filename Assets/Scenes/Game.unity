@@ -468,7 +468,7 @@ GameObject:
   - component: {fileID: 1271927453}
   - component: {fileID: 1271927452}
   - component: {fileID: 1271927451}
-  m_Layer: 0
+  m_Layer: 6
   m_Name: Plane
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -628,8 +628,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::GameSceneQuickStartRunner
   _runOnStart: 1
   _editorOnly: 1
-  _hostAddress: 127.0.0.1
-  _port: 18000
   _initialDelaySeconds: 0.1
   _retryIntervalSeconds: 0.1
   _maxRetryCount: 40

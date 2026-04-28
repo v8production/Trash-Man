@@ -8,11 +8,14 @@ public class LobbySessionManager
 {
     private const int JoinCodeLength = 6;
     private const string VoiceSecretPrefix = "trash-man-lobby";
+    private const string SessionSecretSuffix = "-session";
     private const string LobbyMetadataJoinCode = "join_code";
     private const string LobbyMetadataHostUserId = "host_user_id";
     private const string LobbyMetadataVoiceSecret = "voice_secret";
     private const float LobbyStateSyncIntervalSeconds = 1f;
     private const string LobbyMetadataHostSteamId = "host_steam_id";
+    private const string MemberMetadataSteamId = "steam_id";
+    private const string MemberMetadataIsHost = "is_host";
 
     private static readonly char[] JoinCodeAlphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ0123456789".ToCharArray();
 
@@ -23,6 +26,11 @@ public class LobbySessionManager
     private ulong _currentDiscordLobbyId;
     private float _nextLobbyStateSyncTime;
     private ulong _currentHostSteamId;
+
+    private bool _pendingSteamClientConnect;
+    private bool _hasRequestedSteamClientStart;
+    private float _pendingSteamClientConnectDeadline;
+    private bool _hasShownPendingSteamConnectToast;
 
     private static bool s_loggedNetcodeMissing;
     private static bool s_loggedNetworkManagerMissing;
@@ -67,6 +75,7 @@ public class LobbySessionManager
 
         _nextLobbyStateSyncTime = Time.unscaledTime + LobbyStateSyncIntervalSeconds;
         RefreshHostStateFromDiscordMetadata();
+        TryResolvePendingSteamClientConnect();
     }
 
     public void Clear()
@@ -85,17 +94,14 @@ public class LobbySessionManager
         _currentHostSteamId = 0;
         _currentDiscordLobbyId = 0;
         _nextLobbyStateSyncTime = 0f;
+        _pendingSteamClientConnect = false;
+        _hasRequestedSteamClientStart = false;
+        _pendingSteamClientConnectDeadline = 0f;
+        _hasShownPendingSteamConnectToast = false;
         ResetClientConnectionTracking();
     }
 
-    public static string NormalizeJoinCode(string value)
-    {
-        if (string.IsNullOrWhiteSpace(value))
-            return string.Empty;
-
-        string trimmed = value.Trim().ToUpperInvariant();
-        return trimmed.Length == JoinCodeLength ? trimmed : string.Empty;
-    }
+    public static string NormalizeJoinCode(string value) => Util.NormalizeLobbyJoinCode(value);
 
     public bool HasJoinCode(string rawJoinCode)
     {
@@ -175,16 +181,21 @@ public class LobbySessionManager
         CleanupExistingLobbyObjects();
 
         CurrentJoinCode = joinCode;
-        string lobbySecret = BuildVoiceSecret(joinCode);
-        _currentVoiceSecret = lobbySecret;
+        string sessionSecret = BuildSessionSecret(joinCode);
+        string voiceSecret = BuildVoiceSecret(joinCode);
+        _currentVoiceSecret = voiceSecret;
         _nextLobbyStateSyncTime = 0f;
+        _pendingSteamClientConnect = false;
+        _hasRequestedSteamClientStart = false;
+        _pendingSteamClientConnectDeadline = 0f;
+        _hasShownPendingSteamConnectToast = false;
 
         bool requested = Managers.Discord.CreateOrJoinSessionLobby(
-            lobbySecret,
+            sessionSecret,
             null,
-            BuildLocalMemberMetadata(),
+            BuildLocalMemberMetadata(false),
             false,
-            (success, lobbyId, error) => HandleDiscordLobbyJoined(success, lobbyId, lobbySecret, false, error));
+            (success, lobbyId, error) => HandleDiscordLobbyJoined(success, lobbyId, voiceSecret, false, error));
 
         if (!requested)
         {
@@ -211,6 +222,10 @@ public class LobbySessionManager
         _currentHostSteamId = 0;
         _currentDiscordLobbyId = 0;
         _nextLobbyStateSyncTime = 0f;
+        _pendingSteamClientConnect = false;
+        _hasRequestedSteamClientStart = false;
+        _pendingSteamClientConnectDeadline = 0f;
+        _hasShownPendingSteamConnectToast = false;
         ResetClientConnectionTracking();
     }
 
@@ -264,12 +279,18 @@ public class LobbySessionManager
 
         string joinCode = GenerateUniqueJoinCode();
         string voiceSecret = BuildVoiceSecret(joinCode);
+        string sessionSecret = BuildSessionSecret(joinCode);
 
         HostUserId = Managers.Discord.LocalUserId;
         CurrentJoinCode = joinCode;
         _currentVoiceSecret = voiceSecret;
         _currentHostSteamId = Managers.Steam.LocalSteamId.m_SteamID;
         _nextLobbyStateSyncTime = 0f;
+
+        _pendingSteamClientConnect = false;
+        _hasRequestedSteamClientStart = false;
+        _pendingSteamClientConnectDeadline = 0f;
+        _hasShownPendingSteamConnectToast = false;
 
         IsHosting = TryStartSteamHost();
 
@@ -292,9 +313,9 @@ public class LobbySessionManager
             HostUserId);
 
         bool requested = Managers.Discord.CreateOrJoinSessionLobby(
-            _currentVoiceSecret,
+            sessionSecret,
             lobbyMetadata,
-            BuildLocalMemberMetadata(),
+            BuildLocalMemberMetadata(true),
             true,
             (success, lobbyId, error) => HandleDiscordLobbyJoined(success, lobbyId, _currentVoiceSecret, true, error));
 
@@ -327,6 +348,11 @@ public class LobbySessionManager
 
         _currentDiscordLobbyId = lobbyId;
 
+        _pendingSteamClientConnect = false;
+        _hasRequestedSteamClientStart = false;
+        _pendingSteamClientConnectDeadline = 0f;
+        _hasShownPendingSteamConnectToast = false;
+
         if (Managers.Discord.TryGetSessionLobbyMetadata(lobbyId, out Dictionary<string, string> metadata) && metadata != null)
         {
             if (metadata.TryGetValue(LobbyMetadataJoinCode, out string metadataJoinCode) &&
@@ -355,11 +381,18 @@ public class LobbySessionManager
         {
             if (_currentHostSteamId == 0)
             {
-                HasLobbyNetworkConnectionFailed = true;
-                LastLobbyNetworkError = "Discord lobby is missing host SteamID metadata.";
-                Debug.LogWarning($"[Lobby] {LastLobbyNetworkError}");
-                Managers.Toast.EnqueueMessage("Failed to connect to lobby host.", 2.5f);
-                Managers.Scene.LoadScene(Define.Scene.Intro);
+                // Metadata can arrive after the join callback.
+                // Keep the client in LobbyScene and retry until metadata appears (or timeout).
+                _pendingSteamClientConnect = true;
+                _pendingSteamClientConnectDeadline = Time.unscaledTime + 6f;
+
+                if (!_hasShownPendingSteamConnectToast)
+                {
+                    _hasShownPendingSteamConnectToast = true;
+                    Managers.Toast.EnqueueMessage("Connecting to lobby host...", 2.0f);
+                }
+
+                Debug.LogWarning("[Lobby] Discord lobby is missing host SteamID metadata. Waiting for lobby update.");
                 return;
             }
 
@@ -372,6 +405,8 @@ public class LobbySessionManager
                 Managers.Scene.LoadScene(Define.Scene.Intro);
                 return;
             }
+
+            _hasRequestedSteamClientStart = true;
         }
 
         Managers.Discord.NotifyLobbyUserJoined(Managers.Discord.LocalUserId, Managers.Discord.LocalDisplayName, true);
@@ -396,12 +431,16 @@ public class LobbySessionManager
         };
     }
 
-    private static Dictionary<string, string> BuildLocalMemberMetadata()
+    private static Dictionary<string, string> BuildLocalMemberMetadata(bool isHost)
     {
+        ulong steamId = Managers.Steam.IsInitialized ? Managers.Steam.LocalSteamId.m_SteamID : 0;
+
         return new Dictionary<string, string>
         {
             ["discord_user_id"] = Managers.Discord.LocalUserId,
             ["display_name"] = Managers.Discord.LocalDisplayName,
+            [MemberMetadataSteamId] = steamId != 0 ? steamId.ToString() : string.Empty,
+            [MemberMetadataIsHost] = isHost ? "1" : "0",
         };
     }
 
@@ -451,12 +490,19 @@ public class LobbySessionManager
         return $"{VoiceSecretPrefix}-{joinCode.ToLowerInvariant()}";
     }
 
+    private static string BuildSessionSecret(string joinCode)
+    {
+        return $"{VoiceSecretPrefix}-{joinCode.ToLowerInvariant()}{SessionSecretSuffix}";
+    }
+
     private void HandleSessionLobbyUpdated(ulong lobbyId)
     {
         if (lobbyId != _currentDiscordLobbyId)
             return;
 
         _nextLobbyStateSyncTime = 0f;
+        RefreshHostStateFromDiscordMetadata();
+        TryResolvePendingSteamClientConnect();
     }
 
     private void HandleSessionLobbyMemberAdded(ulong lobbyId, ulong memberId)
@@ -465,6 +511,8 @@ public class LobbySessionManager
             return;
 
         _nextLobbyStateSyncTime = 0f;
+        RefreshHostStateFromDiscordMetadata();
+        TryResolvePendingSteamClientConnect();
     }
 
     private void HandleSessionLobbyMemberRemoved(ulong lobbyId, ulong memberId)
@@ -473,6 +521,8 @@ public class LobbySessionManager
             return;
 
         _nextLobbyStateSyncTime = 0f;
+        RefreshHostStateFromDiscordMetadata();
+        TryResolvePendingSteamClientConnect();
     }
 
     private void RefreshHostStateFromDiscordMetadata()
@@ -499,6 +549,85 @@ public class LobbySessionManager
         if (metadata.TryGetValue(LobbyMetadataVoiceSecret, out string metadataVoiceSecret) &&
             !string.IsNullOrWhiteSpace(metadataVoiceSecret))
             _currentVoiceSecret = metadataVoiceSecret;
+
+        if (_currentHostSteamId == 0)
+            TryResolveHostSteamIdFromMemberMetadata();
+    }
+
+    private void TryResolveHostSteamIdFromMemberMetadata()
+    {
+        if (_currentDiscordLobbyId == 0)
+            return;
+
+        if (!Managers.Discord.TryGetSessionLobbyMemberIds(_currentDiscordLobbyId, out ulong[] memberIds) || memberIds == null || memberIds.Length == 0)
+            return;
+
+        ulong hostDiscordId = 0;
+        ulong.TryParse(HostUserId, out hostDiscordId);
+
+        for (int i = 0; i < memberIds.Length; i++)
+        {
+            ulong memberId = memberIds[i];
+            if (memberId == 0)
+                continue;
+
+            if (!Managers.Discord.TryGetSessionLobbyMemberMetadata(_currentDiscordLobbyId, memberId, out Dictionary<string, string> memberMetadata) || memberMetadata == null)
+                continue;
+
+            bool isHost = false;
+            if (memberMetadata.TryGetValue(MemberMetadataIsHost, out string isHostValue))
+                isHost = string.Equals(isHostValue, "1", StringComparison.Ordinal) || string.Equals(isHostValue, "true", StringComparison.OrdinalIgnoreCase);
+
+            if (!isHost && hostDiscordId != 0)
+                isHost = memberId == hostDiscordId;
+
+            if (!isHost)
+                continue;
+
+            if (memberMetadata.TryGetValue(MemberMetadataSteamId, out string steamIdValue) && ulong.TryParse(steamIdValue, out ulong steamId) && steamId != 0)
+            {
+                _currentHostSteamId = steamId;
+                return;
+            }
+        }
+    }
+
+    private void TryResolvePendingSteamClientConnect()
+    {
+        if (IsHosting)
+            return;
+
+        if (!_pendingSteamClientConnect || _hasRequestedSteamClientStart)
+            return;
+
+        if (_currentDiscordLobbyId == 0)
+            return;
+
+        if (_currentHostSteamId != 0)
+        {
+            if (!TryStartSteamClient(_currentHostSteamId))
+            {
+                HasLobbyNetworkConnectionFailed = true;
+                LastLobbyNetworkError = $"Failed to start Steam client. hostSteamId={_currentHostSteamId}";
+                Debug.LogWarning($"[Lobby] {LastLobbyNetworkError}");
+                Managers.Toast.EnqueueMessage("Failed to connect to lobby host.", 2.5f);
+                Managers.Scene.LoadScene(Define.Scene.Intro);
+                return;
+            }
+
+            _hasRequestedSteamClientStart = true;
+            _pendingSteamClientConnect = false;
+            return;
+        }
+
+        if (Time.unscaledTime >= _pendingSteamClientConnectDeadline)
+        {
+            HasLobbyNetworkConnectionFailed = true;
+            LastLobbyNetworkError = "Discord lobby is missing host SteamID metadata.";
+            Debug.LogWarning($"[Lobby] {LastLobbyNetworkError}");
+            Managers.Toast.EnqueueMessage("Failed to connect to lobby host.", 2.5f);
+            Managers.Scene.LoadScene(Define.Scene.Intro);
+        }
     }
 
     private bool TryStartSteamHost()
@@ -564,6 +693,11 @@ public class LobbySessionManager
         _currentHostSteamId = 0;
         HasLobbyNetworkConnectionFailed = false;
         LastLobbyNetworkError = string.Empty;
+
+        _pendingSteamClientConnect = false;
+        _hasRequestedSteamClientStart = false;
+        _pendingSteamClientConnectDeadline = 0f;
+        _hasShownPendingSteamConnectToast = false;
     }
 
     private static bool TryResolveNetworkObjects(

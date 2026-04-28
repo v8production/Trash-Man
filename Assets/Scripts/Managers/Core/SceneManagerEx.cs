@@ -32,7 +32,7 @@ public class SceneManagerEx
     public void LoadLobbyByCode(string joinCode)
     {
         _enterLobbyAsHost = false;
-        _pendingLobbyJoinCode = LobbySessionManager.NormalizeJoinCode(joinCode);
+        _pendingLobbyJoinCode = Util.NormalizeLobbyJoinCode(joinCode);
         LoadScene(Define.Scene.Lobby);
     }
 
@@ -84,7 +84,7 @@ public class SceneManagerEx
         int start = markerIndex + 5;
         int end = url.IndexOf('&', start);
         string raw = end >= 0 ? url.Substring(start, end - start) : url.Substring(start);
-        string normalized = LobbySessionManager.NormalizeJoinCode(Uri.UnescapeDataString(raw));
+        string normalized = Util.NormalizeLobbyJoinCode(Uri.UnescapeDataString(raw));
         if (string.IsNullOrWhiteSpace(normalized))
             return false;
 

@@ -49,7 +49,7 @@ public class UI_EnterCode : UI_Scene
     private void OnEnterButtonClicked(PointerEventData eventData)
     {
         string rawInput = _enterCodeInput != null ? _enterCodeInput.text : string.Empty;
-        string normalizedCode = LobbySessionManager.NormalizeJoinCode(rawInput);
+        string normalizedCode = Util.NormalizeLobbyJoinCode(rawInput);
         if (string.IsNullOrWhiteSpace(normalizedCode) || normalizedCode.Length != RequiredCodeLength)
         {
             Managers.Toast.EnqueueMessage("Please enter a valid 6-digit code.", 2f);
