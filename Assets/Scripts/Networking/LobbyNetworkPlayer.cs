@@ -120,7 +120,7 @@ public class LobbyNetworkPlayer : NetworkBehaviour
         _discordUserId.OnValueChanged += HandleIdentityChanged;
         _displayName.OnValueChanged += HandleIdentityChanged;
         _selectedTitanRoleMask.OnValueChanged += HandleSelectedRoleChanged;
-        _activeTitanRole.OnValueChanged += HandleSelectedRoleChanged;
+        _activeTitanRole.OnValueChanged += HandleActiveRoleChanged;
 
         if (isLobbyScene)
         {
@@ -169,7 +169,7 @@ public class LobbyNetworkPlayer : NetworkBehaviour
         _discordUserId.OnValueChanged -= HandleIdentityChanged;
         _displayName.OnValueChanged -= HandleIdentityChanged;
         _selectedTitanRoleMask.OnValueChanged -= HandleSelectedRoleChanged;
-        _activeTitanRole.OnValueChanged -= HandleSelectedRoleChanged;
+        _activeTitanRole.OnValueChanged -= HandleActiveRoleChanged;
 
         string lobbyUserId = GetLobbyUserId();
         if (!string.IsNullOrWhiteSpace(lobbyUserId))
@@ -399,8 +399,6 @@ public class LobbyNetworkPlayer : NetworkBehaviour
         if (_roleInput.Value.Equals(payload))
             return;
 
-        InputDebug.Log($"SubmitRoleInputServerRpc (mask=0x{selectedMask:X}, activeRole={activeRole}) rmbHeld={currentInput.RightMouseHeld} rmbPressed={currentInput.RightMousePressedThisFrame} rmbBuffered={currentInput.RightMouseDetachBuffered} bufferRemaining={_detachInputBufferRemaining:F3} mouse={currentInput.MousePosition} delta={currentInput.MouseDelta}");
-
         SubmitRoleInputServerRpc(payload);
     }
 
@@ -503,6 +501,27 @@ public class LobbyNetworkPlayer : NetworkBehaviour
     private void HandleSelectedRoleChanged(int previousValue, int newValue)
     {
         RefreshRoleSelectionPresentation();
+    }
+
+    private void HandleActiveRoleChanged(int previousValue, int newValue)
+    {
+        RefreshRoleSelectionPresentation();
+
+        // Owner-side: when active role switches, reset virtual mouse baseline and detach buffer.
+        // This prevents immediate pose snaps for roles that map absolute mouse position to joints (legs/arms).
+        if (!IsOwner)
+        {
+            return;
+        }
+
+        BaseScene scene = Managers.Scene.CurrentScene;
+        if (scene == null || scene.SceneType != Define.Scene.Game)
+        {
+            return;
+        }
+
+        _detachInputBufferRemaining = 0f;
+        Managers.Input.ResetTitanMouseBaseline();
     }
 
     private void UpdateRuntimeObjectName()

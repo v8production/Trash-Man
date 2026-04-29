@@ -17,6 +17,7 @@ public sealed class FootAttachmentController : MonoBehaviour
     [SerializeField] private float probeDistance = 0.18f;
     [SerializeField] private float probeStartOffset = 0.05f;
     [SerializeField] private bool drawDebugGizmos;
+    [SerializeField] private bool logAttachDetachTransitions = true;
 
     private bool detachHeld;
     private bool isAttached;
@@ -45,7 +46,6 @@ public sealed class FootAttachmentController : MonoBehaviour
             return;
         }
 
-        InputDebug.Log($"{LogPrefix} side={side} detachHeld {detachHeld} -> {held} attached={isAttached} contact={GetCurrentContactPoint()} collider={attachedCollider?.name ?? "<none>"}");
         detachHeld = held;
         if (detachHeld)
         {
@@ -78,7 +78,6 @@ public sealed class FootAttachmentController : MonoBehaviour
     {
         if (detachHeld)
         {
-            InputDebug.Log($"{LogPrefix} side={side} reattach blocked: detach held.");
             return;
         }
 
@@ -89,7 +88,6 @@ public sealed class FootAttachmentController : MonoBehaviour
 
         if (!TryGetGroundHit(out RaycastHit hit))
         {
-            InputDebug.Log($"{LogPrefix} side={side} no valid ground hit for attach. probe={GetCurrentContactPoint()}");
             return;
         }
 
@@ -109,12 +107,22 @@ public sealed class FootAttachmentController : MonoBehaviour
         attachedWorldRotation = foot.rotation;
         attachedCollider = hit.collider;
         isAttached = true;
-        InputDebug.Log($"{LogPrefix} side={side} attached collider={hit.collider.name} point={hit.point} normal={hit.normal} storedPos={attachedWorldPosition} storedRot={attachedWorldRotation.eulerAngles}");
+
+        int layer = hit.collider.gameObject.layer;
+        string layerName = LayerMask.LayerToName(layer);
+        string layerLabel = string.IsNullOrWhiteSpace(layerName) ? layer.ToString() : $"{layerName}({layer})";
+        if (logAttachDetachTransitions)
+        {
+            Debug.Log($"{InputDebug.Prefix} {LogPrefix} side={side} ATTACH layer={layerLabel} collider={hit.collider.name} point={hit.point} normal={hit.normal} storedPos={attachedWorldPosition} storedRot={attachedWorldRotation.eulerAngles}");
+        }
     }
 
     public void Detach()
     {
-        InputDebug.Log($"{LogPrefix} side={side} detach attached={isAttached} collider={attachedCollider?.name ?? "<none>"} storedPos={attachedWorldPosition} storedRot={attachedWorldRotation.eulerAngles}");
+        if (logAttachDetachTransitions)
+        {
+            Debug.Log($"{InputDebug.Prefix} {LogPrefix} side={side} DETACH attached={isAttached} collider={attachedCollider?.name ?? "<none>"} storedPos={attachedWorldPosition} storedRot={attachedWorldRotation.eulerAngles}");
+        }
         isAttached = false;
         attachedCollider = null;
     }

@@ -85,10 +85,6 @@ public class TitanRoleNetworkDriver : MonoBehaviour
         bool detachRequested = hasInput && (input.RightMouseDetachBuffered || input.RightMouseHeld || input.RightMousePressedThisFrame);
 
         TitanBaseLegRoleController controller = left ? _leftLegController : _rightLegController;
-        if (_shouldLogThisFrame)
-        {
-            InputDebug.Log($"[TitanLegDriver] Prepass side={(left ? "Left" : "Right")} hasInput={hasInput} controller={(controller != null)} detachRequested={detachRequested} held={input.RightMouseHeld} pressed={input.RightMousePressedThisFrame} buffered={input.RightMouseDetachBuffered}");
-        }
 
         if (!detachRequested || controller == null)
         {
@@ -103,18 +99,10 @@ public class TitanRoleNetworkDriver : MonoBehaviour
         TitanBaseLegRoleController controller = left ? _leftLegController : _rightLegController;
         if (controller == null)
         {
-            if (_shouldLogThisFrame)
-            {
-                InputDebug.LogWarning($"[TitanLegDriver] Missing {(left ? "Left" : "Right")} leg controller.");
-            }
             return;
         }
 
         bool detachRequested = hasInput && (input.RightMouseDetachBuffered || input.RightMouseHeld || input.RightMousePressedThisFrame);
-        if (_shouldLogThisFrame)
-        {
-            InputDebug.Log($"[TitanLegDriver] Tick side={(left ? "Left" : "Right")} hasInput={hasInput} detachRequested={detachRequested} held={input.RightMouseHeld} pressed={input.RightMousePressedThisFrame} buffered={input.RightMouseDetachBuffered}");
-        }
 
         if (hasInput && !detachRequested)
         {

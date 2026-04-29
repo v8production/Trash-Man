@@ -30,6 +30,11 @@ public abstract class TitanBaseLegRoleController : TitanBaseController
 
     protected abstract bool IsLeftLeg { get; }
 
+    // Runtime origin capture to prevent pose jumps when the active role switches.
+    private float _lastRoleInputTime = -999f;
+    private Vector2 _capturedMouseOrigin;
+    private bool _hasCapturedMouseOrigin;
+
     protected override void Awake()
     {
         base.Awake();
@@ -40,19 +45,43 @@ public abstract class TitanBaseLegRoleController : TitanBaseController
     {
         if (!Managers.TitanRig.EnsureReady())
         {
-            InputDebug.LogWarning($"[TitanLeg] {Role} skipped: rig not ready.");
             return;
         }
 
         ResolveDependencies();
+
+        // If this controller has not received input ticks recently, treat this as a role activation edge
+        // and capture the current mouse position as a neutral origin. This prevents an immediate pose
+        // snap if the mouse is far from screen center at the moment of role switch.
+        float now = Time.unscaledTime;
+        bool roleActivated = (now - _lastRoleInputTime) > 0.25f;
+        _lastRoleInputTime = now;
+        if (roleActivated)
+        {
+            _capturedMouseOrigin = input.MousePosition;
+            _hasCapturedMouseOrigin = true;
+        }
+
         TitanLegInputCommand command = EvaluateLegInput(input, Managers.Input.GetTitanMouseSensitivity());
-        InputDebug.Log($"[TitanLeg] {Role} command side={command.Side} detach={command.DetachHeld} mouse={command.MousePosition} delta={command.MouseDelta} targetYaw={command.TargetHipYaw:F2} targetRoll={command.TargetHipRoll:F2} knee={command.KneeInput:F2}");
         legAnchorResolver?.UpdateDetachState(command.Side, command.DetachHeld);
 
         TitanLegControlState state = Managers.TitanRig.GetLegState(left: IsLeftLeg);
         if (legAnchorResolver != null && legAnchorResolver.TryApplyAnchoredMovement(command.Side, command, state, deltaTime))
         {
-            InputDebug.Log($"[TitanLeg] {Role} applied anchored movement.");
+            if (legAnchorResolver.AreBothFeetAttached())
+            {
+                // Both feet attached: leg input must not move either leg pose.
+                // Root is hard-locked in TitanLegAnchorResolver.
+                return;
+            }
+
+            // IMPORTANT:
+            // When the foot is anchored, we move the movement root inversely to the commanded hip delta.
+            // If we don't also advance the leg state toward the command, the same delta is observed again
+            // next frame and the root keeps accumulating rotation, causing runaway spinning.
+            state.HipYaw = command.TargetHipYaw;
+            state.HipRoll = command.TargetHipRoll;
+            Managers.TitanRig.SetLegState(left: IsLeftLeg, state);
             Managers.TitanRig.ApplyLegPose(left: IsLeftLeg);
             return;
         }
@@ -102,9 +131,17 @@ public abstract class TitanBaseLegRoleController : TitanBaseController
 
     private TitanLegInputCommand EvaluateLegInput(in TitanAggregatedInput input, float sensitivity)
     {
-        Vector2 origin = useScreenCenterAsOrigin
-            ? new Vector2(Screen.width * 0.5f, Screen.height * 0.5f)
-            : mouseOriginPixels;
+        Vector2 origin;
+        if (_hasCapturedMouseOrigin)
+        {
+            origin = _capturedMouseOrigin;
+        }
+        else
+        {
+            origin = useScreenCenterAsOrigin
+                ? new Vector2(Screen.width * 0.5f, Screen.height * 0.5f)
+                : mouseOriginPixels;
+        }
 
         float resolvedBaseRadius = Mathf.Max(0.01f, hipRadiusPixels);
         float normalizedX = Mathf.Clamp((input.MousePosition.x - origin.x) / resolvedBaseRadius, -1f, 1f);

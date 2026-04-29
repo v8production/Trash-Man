@@ -28,6 +28,14 @@ public class InputManager
         return TitanMouseSensitivity;
     }
 
+    public void ResetTitanMouseBaseline()
+    {
+        // Used when switching active titan control roles.
+        // Without this, the virtual mouse position (cursor-locked mode) carries over
+        // and absolute mouse-to-pose mappings can snap immediately on role activation.
+        _hasVirtualMousePosition = false;
+    }
+
     private InputAction _lookAction;
 
     public void Init()

@@ -23,7 +23,14 @@ public sealed class TitanLegAnchorResolver : MonoBehaviour
 
     [Header("Anchor Stabilization")]
     [SerializeField] private float singleFootYawCorrectionScale = 1f;
+    [SerializeField] private float singleFootYawCorrectionSpeed = 12f;
+    [SerializeField] private float singleFootMaxYawCorrectionDegreesPerFrame = 2.5f;
+    [SerializeField] private float singleFootYawDeadZoneDegrees = 0.25f;
     [SerializeField] private bool zeroBodyVelocityWhenLocked = true;
+
+    private bool wasLocked;
+    private Vector3 lockedRootPosition;
+    private Quaternion lockedRootRotation;
 
     private void Awake()
     {
@@ -33,8 +40,7 @@ public sealed class TitanLegAnchorResolver : MonoBehaviour
     private void LateUpdate()
     {
         ResolveReferences();
-        StabilizeAnchors();
-        LogAttachmentTickState();
+        StabilizeAnchors(Time.deltaTime);
     }
 
     public bool HasAnyAttachedFoot()
@@ -42,10 +48,14 @@ public sealed class TitanLegAnchorResolver : MonoBehaviour
         return GetAnchorMode() != AnchorMode.Free;
     }
 
+    public bool AreBothFeetAttached()
+    {
+        return GetAnchorMode() == AnchorMode.Locked;
+    }
+
     public void UpdateDetachState(TitanBaseLegRoleController.LegSide side, bool detachHeld)
     {
         FootAttachmentController controller = GetAttachment(side);
-        InputDebug.Log($"{LogPrefix} UpdateDetachState side={side} controller={(controller != null)} attached={controller != null && controller.IsAttached} detachHeld={detachHeld}");
         controller?.SetDetachHeld(detachHeld);
     }
 
@@ -54,10 +64,8 @@ public sealed class TitanLegAnchorResolver : MonoBehaviour
         ResolveReferences();
 
         AnchorMode mode = GetAnchorMode();
-        InputDebug.Log($"{LogPrefix} TryApplyAnchoredMovement side={side} mode={mode} currentYaw={currentState.HipYaw:F2} targetYaw={command.TargetHipYaw:F2} currentRoll={currentState.HipRoll:F2} targetRoll={command.TargetHipRoll:F2}");
         if (mode == AnchorMode.Locked)
         {
-            InputDebug.Log($"{LogPrefix} side={side} blocked: both feet attached.");
             return true;
         }
 
@@ -65,7 +73,6 @@ public sealed class TitanLegAnchorResolver : MonoBehaviour
         bool rightAnchored = mode == AnchorMode.RightAnchored;
         if ((side == TitanBaseLegRoleController.LegSide.Left && !leftAnchored) || (side == TitanBaseLegRoleController.LegSide.Right && !rightAnchored))
         {
-            InputDebug.Log($"{LogPrefix} side={side} free movement: opposite foot owns anchor.");
             return false;
         }
 
@@ -73,7 +80,6 @@ public sealed class TitanLegAnchorResolver : MonoBehaviour
         FootAttachmentController anchor = GetAttachment(side);
         if (movableRoot == null || anchor == null || !anchor.IsAttached)
         {
-            InputDebug.LogWarning($"{LogPrefix} side={side} cannot anchor. movableRoot={(movableRoot != null)} attachment={(anchor != null)} attached={(anchor != null && anchor.IsAttached)}");
             return false;
         }
 
@@ -99,13 +105,12 @@ public sealed class TitanLegAnchorResolver : MonoBehaviour
 
         Vector3 nextPosition = pivot + rotatedOffset + translatedOffset;
         Quaternion nextRotation = combinedRotation * movableRoot.rotation;
-        InputDebug.Log($"{LogPrefix} side={side} anchored move pivot={pivot} inverseYaw={inverseYaw:F2} inverseRoll={inverseRoll:F2} translatedOffset={translatedOffset}");
         Managers.TitanRig.ApplyMovementRootPose(nextPosition, nextRotation, zeroVelocities: false);
-        StabilizeAnchors();
+        StabilizeAnchors(deltaTime);
         return true;
     }
 
-    private void StabilizeAnchors()
+    private void StabilizeAnchors(float deltaTime)
     {
         if (!Managers.TitanRig.EnsureReady())
         {
@@ -113,22 +118,56 @@ public sealed class TitanLegAnchorResolver : MonoBehaviour
         }
 
         AnchorMode mode = GetAnchorMode();
-        InputDebug.Log($"{LogPrefix} StabilizeAnchors mode={mode} leftAttached={(leftFootAttachment != null && leftFootAttachment.IsAttached)} rightAttached={(rightFootAttachment != null && rightFootAttachment.IsAttached)}");
+
+        // Capture the root pose when entering locked mode.
+        if (mode == AnchorMode.Locked)
+        {
+            if (!wasLocked)
+            {
+                Transform movableRoot = Managers.TitanRig.MovementRoot;
+                if (movableRoot != null)
+                {
+                    lockedRootPosition = movableRoot.position;
+                    lockedRootRotation = movableRoot.rotation;
+                }
+            }
+
+            wasLocked = true;
+        }
+        else
+        {
+            wasLocked = false;
+        }
+
         switch (mode)
         {
             case AnchorMode.LeftAnchored:
-                ApplySingleAnchorLock(leftFootAttachment, zeroBodyVelocityWhenLocked: false);
+                ApplySingleAnchorLock(leftFootAttachment, deltaTime, zeroBodyVelocityWhenLocked: false);
                 break;
             case AnchorMode.RightAnchored:
-                ApplySingleAnchorLock(rightFootAttachment, zeroBodyVelocityWhenLocked: false);
+                ApplySingleAnchorLock(rightFootAttachment, deltaTime, zeroBodyVelocityWhenLocked: false);
                 break;
             case AnchorMode.Locked:
-                ApplyDualAnchorLock(zeroBodyVelocityWhenLocked);
+                // When both feet are attached, do NOT attempt corrective yaw/translation based on current contact points.
+                // Any tiny foot transform jitter (IK/animation) will feedback into root correction and cause drift/spin.
+                // Hard-lock the movement root pose instead.
+                ApplyLockedRootPose(zeroBodyVelocityWhenLocked);
                 break;
         }
     }
 
-    private void ApplySingleAnchorLock(FootAttachmentController attachment, bool zeroBodyVelocityWhenLocked)
+    private void ApplyLockedRootPose(bool zeroVelocities)
+    {
+        Transform movableRoot = Managers.TitanRig.MovementRoot;
+        if (movableRoot == null)
+        {
+            return;
+        }
+
+        Managers.TitanRig.ApplyMovementRootPose(lockedRootPosition, lockedRootRotation, zeroVelocities);
+    }
+
+    private void ApplySingleAnchorLock(FootAttachmentController attachment, float deltaTime, bool zeroBodyVelocityWhenLocked)
     {
         Transform movableRoot = Managers.TitanRig.MovementRoot;
         if (movableRoot == null || attachment == null || !attachment.IsAttached || attachment.FootTransform == null)
@@ -145,9 +184,22 @@ public sealed class TitanLegAnchorResolver : MonoBehaviour
         if (currentForward.sqrMagnitude > 0.0001f && desiredForward.sqrMagnitude > 0.0001f)
         {
             float yawDelta = Vector3.SignedAngle(currentForward, desiredForward, Vector3.up) * singleFootYawCorrectionScale;
-            if (Mathf.Abs(yawDelta) > 0.001f)
+            if (Mathf.Abs(yawDelta) > singleFootYawDeadZoneDegrees)
             {
-                Quaternion yawRotation = Quaternion.AngleAxis(yawDelta, Vector3.up);
+                float blend = 1f - Mathf.Exp(-Mathf.Max(0.01f, singleFootYawCorrectionSpeed) * Mathf.Max(0f, deltaTime));
+                float step = yawDelta * blend;
+                float maxStep = Mathf.Max(0f, singleFootMaxYawCorrectionDegreesPerFrame);
+                if (maxStep > 0.0001f)
+                {
+                    step = Mathf.Clamp(step, -maxStep, maxStep);
+                }
+
+                if (Mathf.Abs(step) < 0.0001f)
+                {
+                    step = Mathf.Sign(yawDelta) * 0.0001f;
+                }
+
+                Quaternion yawRotation = Quaternion.AngleAxis(step, Vector3.up);
                 Vector3 rotatedPosition = desiredPivot + (yawRotation * (movableRoot.position - desiredPivot));
                 nextRotation = yawRotation * nextRotation;
                 Managers.TitanRig.ApplyMovementRootPose(rotatedPosition, nextRotation, zeroBodyVelocityWhenLocked);
@@ -155,13 +207,15 @@ public sealed class TitanLegAnchorResolver : MonoBehaviour
             }
         }
 
-        Vector3 translationDelta = desiredPivot - currentPivot;
+        // Only correct planar translation.
+        // Vertical correction based on a probe point is unstable (probe may not be at the sole),
+        // and can push the whole titan into/under the floor when roles switch or IK jitters.
+        Vector3 translationDelta = Vector3.ProjectOnPlane(desiredPivot - currentPivot, Vector3.up);
         if (translationDelta.sqrMagnitude <= 0.0000001f)
         {
             return;
         }
 
-        InputDebug.Log($"{LogPrefix} SingleAnchor correction pivot={desiredPivot} current={currentPivot} translationDelta={translationDelta}");
         Managers.TitanRig.ApplyMovementRootPose(movableRoot.position + translationDelta, movableRoot.rotation, zeroBodyVelocityWhenLocked);
     }
 
@@ -203,7 +257,6 @@ public sealed class TitanLegAnchorResolver : MonoBehaviour
         }
 
         nextPosition += desiredMid - currentMid;
-        InputDebug.Log($"{LogPrefix} DualAnchor correction currentMid={currentMid} desiredMid={desiredMid} nextPosition={nextPosition}");
         Managers.TitanRig.ApplyMovementRootPose(nextPosition, nextRotation, zeroVelocities);
     }
 
@@ -259,18 +312,5 @@ public sealed class TitanLegAnchorResolver : MonoBehaviour
         }
     }
 
-    private void LogAttachmentTickState()
-    {
-        if (!InputDebug.Enabled)
-        {
-            return;
-        }
-
-        FootAttachmentController left = leftFootAttachment;
-        FootAttachmentController right = rightFootAttachment;
-        InputDebug.Log(
-            $"{LogPrefix} Tick mode={GetAnchorMode()} " +
-            $"leftAttached={(left != null && left.IsAttached)} leftDetached={(left == null || !left.IsAttached)} leftDetachHeld={(left != null && left.DetachHeld)} leftCollider={(left != null && left.AttachedCollider != null ? left.AttachedCollider.name : "<none>")} leftContact={(left != null ? left.GetCurrentContactPoint() : Vector3.zero)} " +
-            $"rightAttached={(right != null && right.IsAttached)} rightDetached={(right == null || !right.IsAttached)} rightDetachHeld={(right != null && right.DetachHeld)} rightCollider={(right != null && right.AttachedCollider != null ? right.AttachedCollider.name : "<none>")} rightContact={(right != null ? right.GetCurrentContactPoint() : Vector3.zero)}");
-    }
+    // Intentionally no per-frame debug logging here.
 }

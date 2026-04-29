@@ -133,20 +133,16 @@ public class TitanRoleManager
         input = default;
         if (!RefreshRoleMap(false, out string error))
         {
-            InputDebug.LogWarning($"[TitanRoleManager] TryGetRoleInput role={role} failed: refreshRoleMap error='{error}'");
             return false;
         }
 
         if (!_playersByRole.TryGetValue(role, out LobbyNetworkPlayer player) || player == null)
         {
-            InputDebug.LogWarning($"[TitanRoleManager] TryGetRoleInput role={role} failed: no mapped player.");
             return false;
         }
 
         if (!player.IsActivelyControllingRole(role))
         {
-            player.TryGetActiveTitanRole(out Define.TitanRole activeRole);
-            InputDebug.LogWarning($"[TitanRoleManager] TryGetRoleInput role={role} blocked: owner={player.OwnerClientId} activeRole={activeRole} selectedMask=0x{player.SelectedTitanRoleMaskValue:X}");
             return false;
         }
 
