@@ -11,8 +11,10 @@ public sealed class TitanRigRuntime : MonoBehaviour
     [SerializeField] private Transform rightElbow;
     [SerializeField] private Transform leftHip;
     [SerializeField] private Transform leftKnee;
+    [SerializeField] private Transform leftFoot;
     [SerializeField] private Transform rightHip;
     [SerializeField] private Transform rightKnee;
+    [SerializeField] private Transform rightFoot;
     [SerializeField] private Transform spine;
 
     [Header("Body")]
@@ -62,7 +64,11 @@ public sealed class TitanRigRuntime : MonoBehaviour
 
     public Transform MovementRoot => mechaRoot != null ? mechaRoot : transform;
     public Transform LeftHip => leftHip;
+    public Transform LeftKnee => leftKnee;
+    public Transform LeftFoot => leftFoot;
     public Transform RightHip => rightHip;
+    public Transform RightKnee => rightKnee;
+    public Transform RightFoot => rightFoot;
     public Rigidbody MovementRigidbody
     {
         get
@@ -464,8 +470,10 @@ public sealed class TitanRigRuntime : MonoBehaviour
             rightElbow ??= animator.GetBoneTransform(HumanBodyBones.RightLowerArm);
             leftHip ??= animator.GetBoneTransform(HumanBodyBones.LeftUpperLeg);
             leftKnee ??= animator.GetBoneTransform(HumanBodyBones.LeftLowerLeg);
+            leftFoot ??= animator.GetBoneTransform(HumanBodyBones.LeftFoot);
             rightHip ??= animator.GetBoneTransform(HumanBodyBones.RightUpperLeg);
             rightKnee ??= animator.GetBoneTransform(HumanBodyBones.RightLowerLeg);
+            rightFoot ??= animator.GetBoneTransform(HumanBodyBones.RightFoot);
             spine ??= animator.GetBoneTransform(HumanBodyBones.Chest);
             spine ??= animator.GetBoneTransform(HumanBodyBones.UpperChest);
             spine ??= animator.GetBoneTransform(HumanBodyBones.Spine);
@@ -499,6 +507,10 @@ public sealed class TitanRigRuntime : MonoBehaviour
             "Character1_LeftLeg", "LeftLeg", "mixamorig:LeftLeg", "mixamorigLeftLeg",
             "J_Bip_L_LowerLeg", "LeftLowerLeg", "LowerLeg_L", "L_Calf", "Bip001 L Calf");
 
+        leftFoot ??= FindChildByNames(searchRoot,
+            "LeftFoot", "mixamorig:LeftFoot",
+            "mixamorigLeftFoot", "Bip001 L Foot", "L_Foot");
+
         rightHip ??= FindChildByNames(searchRoot,
             "Character1_RightUpLeg", "RightUpLeg", "mixamorig:RightUpLeg", "mixamorigRightUpLeg",
             "J_Bip_R_UpperLeg", "RightUpperLeg", "UpperLeg_R", "R_Thigh", "Bip001 R Thigh");
@@ -506,6 +518,10 @@ public sealed class TitanRigRuntime : MonoBehaviour
         rightKnee ??= FindChildByNames(searchRoot,
             "Character1_RightLeg", "RightLeg", "mixamorig:RightLeg", "mixamorigRightLeg",
             "J_Bip_R_LowerLeg", "RightLowerLeg", "LowerLeg_R", "R_Calf", "Bip001 R Calf");
+
+        rightFoot ??= FindChildByNames(searchRoot,
+            "RightFoot", "mixamorig:RightFoot",
+            "mixamorigRightFoot", "Bip001 R Foot", "R_Foot");
 
         spine ??= FindChildByNames(searchRoot,
             "Character1_Chest", "Character1_UpperChest", "Character1_Spine",

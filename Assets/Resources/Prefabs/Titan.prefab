@@ -613,8 +613,10 @@ MonoBehaviour:
   rightElbow: {fileID: 1743231240146526418}
   leftHip: {fileID: 1581880232147977060}
   leftKnee: {fileID: 3118277338547812540}
+  leftFoot: {fileID: 6989488937968845983}
   rightHip: {fileID: 7650065672122287338}
   rightKnee: {fileID: 6782418227976457030}
+  rightFoot: {fileID: 4006448067675433985}
   spine: {fileID: 5886878031583713009}
   waistYaw: 0
   leftArm:
@@ -772,10 +774,14 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::TitanLegAnchorResolver
   leftFootAttachment: {fileID: 4379125399005193119}
   rightFootAttachment: {fileID: 758194761437020032}
+  preserveAnchoredThighWorldPose: 1
   inverseYawScale: 1
   inverseRollScale: 0.75
   inverseMouseDeltaTranslationScale: 0.0025
   singleFootYawCorrectionScale: 1
+  singleFootYawCorrectionSpeed: 12
+  singleFootMaxYawCorrectionDegreesPerFrame: 2.5
+  singleFootYawDeadZoneDegrees: 0.25
   zeroBodyVelocityWhenLocked: 1
 --- !u!114 &4379125399005193119
 MonoBehaviour:
@@ -799,6 +805,8 @@ MonoBehaviour:
   probeDistance: 0.18
   probeStartOffset: 0.05
   drawDebugGizmos: 0
+  logAttachDetachTransitions: 1
+  characterRoot: {fileID: 0}
 --- !u!114 &758194761437020032
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -821,6 +829,8 @@ MonoBehaviour:
   probeDistance: 0.18
   probeStartOffset: 0.05
   drawDebugGizmos: 0
+  logAttachDetachTransitions: 1
+  characterRoot: {fileID: 0}
 --- !u!4 &6782418227976457030 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: -8201243596049249177, guid: 7bd5342e1d2f38c4d823edf668badc2a, type: 3}

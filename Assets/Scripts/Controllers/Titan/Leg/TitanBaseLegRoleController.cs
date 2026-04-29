@@ -35,6 +35,9 @@ public abstract class TitanBaseLegRoleController : TitanBaseController
     private Vector2 _capturedMouseOrigin;
     private bool _hasCapturedMouseOrigin;
 
+    private float _activationHipYaw;
+    private float _activationHipRoll;
+
     protected override void Awake()
     {
         base.Awake();
@@ -50,59 +53,67 @@ public abstract class TitanBaseLegRoleController : TitanBaseController
 
         ResolveDependencies();
 
-        // If this controller has not received input ticks recently, treat this as a role activation edge
-        // and capture the current mouse position as a neutral origin. This prevents an immediate pose
-        // snap if the mouse is far from screen center at the moment of role switch.
+        TitanLegControlState state = Managers.TitanRig.GetLegState(left: IsLeftLeg);
+
         float now = Time.unscaledTime;
         bool roleActivated = (now - _lastRoleInputTime) > 0.25f;
         _lastRoleInputTime = now;
+
         if (roleActivated)
         {
             _capturedMouseOrigin = input.MousePosition;
             _hasCapturedMouseOrigin = true;
+
+            _activationHipYaw = state.HipYaw;
+            _activationHipRoll = state.HipRoll;
         }
 
-        TitanLegInputCommand command = EvaluateLegInput(input, Managers.Input.GetTitanMouseSensitivity());
+        TitanLegInputCommand command = EvaluateLegInput(
+            input,
+            Managers.Input.GetTitanMouseSensitivity()
+        );
+
         legAnchorResolver?.UpdateDetachState(command.Side, command.DetachHeld);
 
-        TitanLegControlState state = Managers.TitanRig.GetLegState(left: IsLeftLeg);
-        if (legAnchorResolver != null && legAnchorResolver.TryApplyAnchoredMovement(command.Side, command, state, deltaTime))
+        if (legAnchorResolver != null &&
+            legAnchorResolver.TryApplyAnchoredMovement(command.Side, command, state, deltaTime))
         {
             if (legAnchorResolver.AreBothFeetAttached())
             {
-                // Both feet attached: leg input must not move either leg pose.
-                // Root is hard-locked in TitanLegAnchorResolver.
                 return;
             }
 
-            // Anchored movement:
-            // Keep the entire anchored leg chain (thigh->toe) fixed in world.
-            // Implementation: do NOT change anchored leg joint targets while anchored.
-            // Mouse movement is reinterpreted as body rotation around the anchored foot pivot.
+            if (roleActivated)
+            {
+                return;
+            }
 
-            // Compute desired inverse body rotation from the would-be hip deltas.
-            float yawDelta = Mathf.DeltaAngle(state.HipYaw, command.TargetHipYaw);
-            float rollDelta = command.TargetHipRoll - state.HipRoll;
-            legAnchorResolver.ApplyInverseRootFromHipDelta(command.Side, yawDelta, rollDelta, command.MouseDelta, deltaTime);
+            float sensitivity = Managers.Input.GetTitanMouseSensitivity();
 
-            // Ensure the anchored leg pose stays at its pre-anchor values.
-            Managers.TitanRig.SetLegState(left: IsLeftLeg, state);
-            Managers.TitanRig.ApplyLegPose(left: IsLeftLeg);
+            float yawDelta = command.MouseDelta.x * 0.12f * sensitivity;
+            float rollDelta = -command.MouseDelta.y * 0.12f * sensitivity;
 
-            legAnchorResolver.StabilizeNow(deltaTime);
+            legAnchorResolver.ApplyInverseRootFromHipDelta(
+                command.Side,
+                yawDelta,
+                rollDelta
+            );
+
             return;
         }
 
         float blend = 1f - Mathf.Exp(-hipSpeed * deltaTime);
+
         state.HipYaw = Mathf.Lerp(state.HipYaw, command.TargetHipYaw, blend);
         state.HipRoll = Mathf.Lerp(state.HipRoll, command.TargetHipRoll, blend);
-
         state.HipYaw = Mathf.Clamp(state.HipYaw, hipYawLimit.x, hipYawLimit.y);
         state.HipRoll = Mathf.Clamp(state.HipRoll, hipRollLimit.x, hipRollLimit.y);
+
         state.KneeRoll = Mathf.Clamp(
             state.KneeRoll + (command.KneeInput * kneeSpeed * deltaTime),
             kneeRollLimit.x,
-            kneeRollLimit.y);
+            kneeRollLimit.y
+        );
 
         Managers.TitanRig.SetLegState(left: IsLeftLeg, state);
         Managers.TitanRig.ApplyLegPose(left: IsLeftLeg);
@@ -115,14 +126,22 @@ public abstract class TitanBaseLegRoleController : TitanBaseController
             return;
         }
 
+        ResolveDependencies();
+
+        if (legAnchorResolver != null &&
+            legAnchorResolver.IsFootAttached(IsLeftLeg ? LegSide.Left : LegSide.Right))
+        {
+            return;
+        }
+
         TitanLegControlState state = Managers.TitanRig.GetLegState(left: IsLeftLeg);
+
         float blend = 1f - Mathf.Exp(-idleReturnSpeed * deltaTime);
 
         state.HipYaw = Mathf.Lerp(state.HipYaw, 0f, blend);
         state.HipRoll = Mathf.Lerp(state.HipRoll, 0f, blend);
         state.KneeRoll = Mathf.Lerp(state.KneeRoll, 0f, blend);
 
-        ResolveDependencies();
         state.HipYaw = Mathf.Clamp(state.HipYaw, hipYawLimit.x, hipYawLimit.y);
         state.HipRoll = Mathf.Clamp(state.HipRoll, hipRollLimit.x, hipRollLimit.y);
         state.KneeRoll = Mathf.Clamp(state.KneeRoll, kneeRollLimit.x, kneeRollLimit.y);
@@ -156,8 +175,11 @@ public abstract class TitanBaseLegRoleController : TitanBaseController
         float maxYawDegrees = Mathf.Max(Mathf.Abs(hipYawLimit.x), Mathf.Abs(hipYawLimit.y));
         float maxRollDegrees = Mathf.Max(Mathf.Abs(hipRollLimit.x), Mathf.Abs(hipRollLimit.y));
 
-        float targetYaw = Mathf.Clamp(normalizedX * maxYawDegrees * sensitivity, hipYawLimit.x, hipYawLimit.y);
-        float targetRoll = Mathf.Clamp(-normalizedY * maxRollDegrees * sensitivity, hipRollLimit.x, hipRollLimit.y);
+        float targetYaw = _activationHipYaw + (normalizedX * maxYawDegrees * sensitivity);
+        float targetRoll = _activationHipRoll + (-normalizedY * maxRollDegrees * sensitivity);
+
+        targetYaw = Mathf.Clamp(targetYaw, hipYawLimit.x, hipYawLimit.y);
+        targetRoll = Mathf.Clamp(targetRoll, hipRollLimit.x, hipRollLimit.y);
         float kneeInput = IsLeftLeg ? input.LeftLegKnee : input.RightLegKnee;
 
         return new TitanLegInputCommand

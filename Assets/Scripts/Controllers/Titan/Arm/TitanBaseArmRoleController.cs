@@ -18,6 +18,10 @@ public abstract class TitanBaseArmRoleController : TitanBaseController
 
     protected abstract bool IsLeftArm { get; }
 
+    private float _lastRoleInputTime = -999f;
+    private Vector2 _capturedMouseOrigin;
+    private bool _hasCapturedMouseOrigin;
+
     public override void TickRoleInput(in TitanAggregatedInput input, float deltaTime)
     {
         if (!Managers.TitanRig.EnsureReady())
@@ -25,34 +29,60 @@ public abstract class TitanBaseArmRoleController : TitanBaseController
             return;
         }
 
+        TitanArmControlState state = Managers.TitanRig.GetArmState(left: IsLeftArm);
+
+        float now = Time.unscaledTime;
+        bool roleActivated = (now - _lastRoleInputTime) > 0.25f;
+        _lastRoleInputTime = now;
+
+        if (roleActivated)
+        {
+            _capturedMouseOrigin = input.MousePosition;
+            _hasCapturedMouseOrigin = true;
+            return;
+        }
+
         Vector2 mousePosition = input.MousePosition;
         Vector2 mouseDelta = input.MouseDelta;
         float sensitivity = Managers.Input.GetTitanMouseSensitivity();
-        Vector2 origin = useScreenCenterAsOrigin
-            ? new Vector2(Screen.width * 0.5f, Screen.height * 0.5f)
-            : mouseOriginPixels;
+
+        Vector2 origin = _hasCapturedMouseOrigin
+            ? _capturedMouseOrigin
+            : useScreenCenterAsOrigin
+                ? new Vector2(Screen.width * 0.5f, Screen.height * 0.5f)
+                : mouseOriginPixels;
+
         float maxRollDegrees = Mathf.Max(Mathf.Abs(shoulderRollLimit.x), Mathf.Abs(shoulderRollLimit.y));
         float resolvedBaseRadius = Mathf.Max(0.01f, shoulderRadiusPixels);
         float normalizedX = Mathf.Clamp((mousePosition.x - origin.x) / resolvedBaseRadius, -1f, 1f);
-        float pitchDegreesPerPixel = maxRollDegrees > 0f ? maxRollDegrees * sensitivity / resolvedBaseRadius : 0f;
+
+        float pitchDegreesPerPixel = maxRollDegrees > 0f
+            ? maxRollDegrees * sensitivity / resolvedBaseRadius
+            : 0f;
 
         float targetRoll = normalizedX * maxRollDegrees * sensitivity;
-        if (IsLeftArm)
-            targetRoll = -targetRoll;
 
-        TitanArmControlState state = Managers.TitanRig.GetArmState(left: IsLeftArm);
+        if (IsLeftArm)
+        {
+            targetRoll = -targetRoll;
+        }
+
         float blend = 1f - Mathf.Exp(-shoulderSpeed * deltaTime);
+
         state.ShoulderRoll = Mathf.Lerp(state.ShoulderRoll, targetRoll, blend);
         state.ShoulderPitch += mouseDelta.y * pitchDegreesPerPixel;
 
         float elbowInput = IsLeftArm ? input.LeftArmElbow : -input.RightArmElbow;
 
         state.ShoulderRoll = Mathf.Clamp(state.ShoulderRoll, shoulderRollLimit.x, shoulderRollLimit.y);
+
         Vector2 resolvedElbowLimit = GetResolvedElbowPitchLimit();
+
         state.ElbowPitch = Mathf.Clamp(
             state.ElbowPitch - (elbowInput * elbowSpeed * deltaTime),
             resolvedElbowLimit.x,
-            resolvedElbowLimit.y);
+            resolvedElbowLimit.y
+        );
 
         Managers.TitanRig.SetArmState(left: IsLeftArm, state);
         Managers.TitanRig.ApplyArmPose(left: IsLeftArm);
