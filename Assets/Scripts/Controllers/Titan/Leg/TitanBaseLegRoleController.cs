@@ -75,14 +75,21 @@ public abstract class TitanBaseLegRoleController : TitanBaseController
                 return;
             }
 
-            // IMPORTANT:
-            // When the foot is anchored, we move the movement root inversely to the commanded hip delta.
-            // If we don't also advance the leg state toward the command, the same delta is observed again
-            // next frame and the root keeps accumulating rotation, causing runaway spinning.
-            state.HipYaw = command.TargetHipYaw;
-            state.HipRoll = command.TargetHipRoll;
+            // Anchored movement:
+            // Keep the entire anchored leg chain (thigh->toe) fixed in world.
+            // Implementation: do NOT change anchored leg joint targets while anchored.
+            // Mouse movement is reinterpreted as body rotation around the anchored foot pivot.
+
+            // Compute desired inverse body rotation from the would-be hip deltas.
+            float yawDelta = Mathf.DeltaAngle(state.HipYaw, command.TargetHipYaw);
+            float rollDelta = command.TargetHipRoll - state.HipRoll;
+            legAnchorResolver.ApplyInverseRootFromHipDelta(command.Side, yawDelta, rollDelta, command.MouseDelta, deltaTime);
+
+            // Ensure the anchored leg pose stays at its pre-anchor values.
             Managers.TitanRig.SetLegState(left: IsLeftLeg, state);
             Managers.TitanRig.ApplyLegPose(left: IsLeftLeg);
+
+            legAnchorResolver.StabilizeNow(deltaTime);
             return;
         }
 

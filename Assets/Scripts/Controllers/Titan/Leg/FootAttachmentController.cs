@@ -12,12 +12,17 @@ public sealed class FootAttachmentController : MonoBehaviour
     [SerializeField] private Transform bottomProbe;
 
     [Header("Ground Detection")]
-    [SerializeField] private LayerMask attachableGroundLayers = 1 << 6;
+    // Default: allow both Default(0) and Ground(6) so basic Plane objects work out of the box.
+    [SerializeField] private LayerMask attachableGroundLayers = (1 << 0) | (1 << 6);
     [SerializeField] private float probeRadius = 0.08f;
     [SerializeField] private float probeDistance = 0.18f;
     [SerializeField] private float probeStartOffset = 0.05f;
     [SerializeField] private bool drawDebugGizmos;
     [SerializeField] private bool logAttachDetachTransitions = true;
+
+    [Header("Filtering")]
+    [Tooltip("Colliders under this root are ignored for ground hits (prevents self-hit when using Default layer).")]
+    [SerializeField] private Transform characterRoot;
 
     private bool detachHeld;
     private bool isAttached;
@@ -70,8 +75,46 @@ public sealed class FootAttachmentController : MonoBehaviour
 
         Vector3 origin = probe.position + (Vector3.up * probeStartOffset);
         float castDistance = probeStartOffset + probeDistance;
-        return Physics.SphereCast(origin, probeRadius, Vector3.down, out hit, castDistance, attachableGroundLayers, QueryTriggerInteraction.Ignore)
-               && hit.collider != null;
+
+        // Use SphereCastAll so we can skip self-colliders reliably.
+        RaycastHit[] hits = Physics.SphereCastAll(origin, probeRadius, Vector3.down, castDistance, attachableGroundLayers, QueryTriggerInteraction.Ignore);
+        if (hits == null || hits.Length == 0)
+        {
+            return false;
+        }
+
+        Transform root = characterRoot != null ? characterRoot : transform.root;
+        float bestDist = float.PositiveInfinity;
+        int bestIndex = -1;
+        for (int i = 0; i < hits.Length; i++)
+        {
+            Collider c = hits[i].collider;
+            if (c == null)
+            {
+                continue;
+            }
+
+            // Skip any collider that belongs to this character.
+            if (root != null && c.transform.IsChildOf(root))
+            {
+                continue;
+            }
+
+            float d = hits[i].distance;
+            if (d < bestDist)
+            {
+                bestDist = d;
+                bestIndex = i;
+            }
+        }
+
+        if (bestIndex < 0)
+        {
+            return false;
+        }
+
+        hit = hits[bestIndex];
+        return hit.collider != null;
     }
 
     public void RefreshAttachmentState()

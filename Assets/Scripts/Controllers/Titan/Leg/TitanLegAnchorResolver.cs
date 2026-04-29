@@ -16,6 +16,9 @@ public sealed class TitanLegAnchorResolver : MonoBehaviour
     [SerializeField] private FootAttachmentController leftFootAttachment;
     [SerializeField] private FootAttachmentController rightFootAttachment;
 
+    [Header("Anchored Leg Compensation")]
+    [SerializeField] private bool preserveAnchoredThighWorldPose = true;
+
     [Header("Inverse Movement")]
     [SerializeField] private float inverseYawScale = 1f;
     [SerializeField] private float inverseRollScale = 0.75f;
@@ -83,11 +86,62 @@ public sealed class TitanLegAnchorResolver : MonoBehaviour
             return false;
         }
 
-        float yawDelta = Mathf.DeltaAngle(currentState.HipYaw, command.TargetHipYaw);
-        float rollDelta = command.TargetHipRoll - currentState.HipRoll;
-        float inverseYaw = -yawDelta * inverseYawScale;
-        float inverseRoll = -rollDelta * inverseRollScale;
+        // Keeping this method as a gate for anchored/non-anchored path.
+        return true;
+    }
 
+    public bool PreserveAnchoredThighWorldPose => preserveAnchoredThighWorldPose;
+
+    public void ApplyCompensatedRootDelta(Transform anchoredThigh, Vector3 beforePos, Quaternion beforeRot)
+    {
+        if (anchoredThigh == null)
+        {
+            return;
+        }
+
+        Transform root = Managers.TitanRig.MovementRoot;
+        if (root == null)
+        {
+            return;
+        }
+
+        Vector3 afterPos = anchoredThigh.position;
+        Quaternion afterRot = anchoredThigh.rotation;
+
+        // delta maps 'after' thigh pose back to 'before'.
+        Quaternion deltaRot = beforeRot * Quaternion.Inverse(afterRot);
+        Vector3 deltaPos = beforePos - (deltaRot * afterPos);
+
+        Vector3 nextRootPos = (deltaRot * root.position) + deltaPos;
+        Quaternion nextRootRot = deltaRot * root.rotation;
+        Managers.TitanRig.ApplyMovementRootPose(nextRootPos, nextRootRot, zeroVelocities: false);
+    }
+
+    public void ApplyInverseRootFromHipDelta(TitanBaseLegRoleController.LegSide side, float hipYawDelta, float hipRollDelta, Vector2 mouseDelta, float deltaTime)
+    {
+        ResolveReferences();
+        if (!Managers.TitanRig.EnsureReady())
+        {
+            return;
+        }
+
+        AnchorMode mode = GetAnchorMode();
+        bool leftAnchored = mode == AnchorMode.LeftAnchored;
+        bool rightAnchored = mode == AnchorMode.RightAnchored;
+        if ((side == TitanBaseLegRoleController.LegSide.Left && !leftAnchored) || (side == TitanBaseLegRoleController.LegSide.Right && !rightAnchored))
+        {
+            return;
+        }
+
+        Transform movableRoot = Managers.TitanRig.MovementRoot;
+        FootAttachmentController anchor = GetAttachment(side);
+        if (movableRoot == null || anchor == null || !anchor.IsAttached)
+        {
+            return;
+        }
+
+        float inverseYaw = -hipYawDelta * inverseYawScale;
+        float inverseRoll = -hipRollDelta * inverseRollScale;
         Quaternion yawRotation = Quaternion.AngleAxis(inverseYaw, Vector3.up);
         Quaternion rollRotation = Quaternion.AngleAxis(inverseRoll, movableRoot.forward);
         Quaternion combinedRotation = yawRotation * rollRotation;
@@ -95,19 +149,22 @@ public sealed class TitanLegAnchorResolver : MonoBehaviour
         Vector3 pivot = anchor.AttachedWorldPosition;
         Vector3 rotatedOffset = combinedRotation * (movableRoot.position - pivot);
         Vector3 translatedOffset = Vector3.zero;
-        if (command.MouseDelta.sqrMagnitude > 0.000001f)
+        if (mouseDelta.sqrMagnitude > 0.000001f)
         {
             Vector3 planarRight = Vector3.ProjectOnPlane(movableRoot.right, Vector3.up).normalized;
             Vector3 planarForward = Vector3.ProjectOnPlane(movableRoot.forward, Vector3.up).normalized;
-            translatedOffset = (planarRight * (-command.MouseDelta.x) + planarForward * (-command.MouseDelta.y))
+            translatedOffset = (planarRight * (-mouseDelta.x) + planarForward * (-mouseDelta.y))
                                * inverseMouseDeltaTranslationScale * deltaTime;
         }
 
         Vector3 nextPosition = pivot + rotatedOffset + translatedOffset;
         Quaternion nextRotation = combinedRotation * movableRoot.rotation;
         Managers.TitanRig.ApplyMovementRootPose(nextPosition, nextRotation, zeroVelocities: false);
+    }
+
+    public void StabilizeNow(float deltaTime)
+    {
         StabilizeAnchors(deltaTime);
-        return true;
     }
 
     private void StabilizeAnchors(float deltaTime)

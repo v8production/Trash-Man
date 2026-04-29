@@ -61,6 +61,8 @@ public sealed class TitanRigRuntime : MonoBehaviour
     }
 
     public Transform MovementRoot => mechaRoot != null ? mechaRoot : transform;
+    public Transform LeftHip => leftHip;
+    public Transform RightHip => rightHip;
     public Rigidbody MovementRigidbody
     {
         get

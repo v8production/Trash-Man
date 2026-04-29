@@ -10,6 +10,8 @@ public sealed class TitanRigManager
     public Transform MovementRoot => runtime != null ? runtime.MovementRoot : null;
     public Rigidbody MovementRigidbody => runtime != null ? runtime.MovementRigidbody : null;
     public Transform Spine => runtime != null ? runtime.Spine : null;
+    public Transform LeftHip => runtime != null ? runtime.LeftHip : null;
+    public Transform RightHip => runtime != null ? runtime.RightHip : null;
     public float WaistYaw => runtime != null ? runtime.WaistYaw : 0f;
 
 
