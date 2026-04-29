@@ -669,7 +669,7 @@ public class LobbyNetworkPlayer : NetworkBehaviour
         if (_lobbyRanger == null)
             return;
 
-        _nicknameUI = Managers.UI.CreateWorldSpaceUI<UI_Nickname>(_lobbyRanger.transform, nameof(UI_Nickname));
+        _nicknameUI = Managers.UI.CreateWorldSpaceUI<UI_Nickname>(_lobbyRanger.transform);
         if (_nicknameUI == null)
             return;
 

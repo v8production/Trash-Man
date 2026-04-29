@@ -20,9 +20,7 @@ public class RangerController : MonoBehaviour
     private bool _initialized;
 
     Animator Anim;
-
     private LocomotionState _animState;
-
     public LocomotionState AnimState
     {
         get { return _animState; }
