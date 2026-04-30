@@ -24,6 +24,12 @@ public sealed class FootAttachmentController : MonoBehaviour
     [Tooltip("Colliders under this root are ignored for ground hits (prevents self-hit when using Default layer).")]
     [SerializeField] private Transform characterRoot;
 
+    [SerializeField] private Transform footIkTarget;
+    [SerializeField] private Transform kneeHint;
+
+    private Vector3 _attachedKneeHintWorldPosition;
+    private bool _hasAttachedKneeHintPosition;
+
     private bool detachHeld;
     private bool isAttached;
     private Vector3 attachedWorldPosition;
@@ -158,6 +164,8 @@ public sealed class FootAttachmentController : MonoBehaviour
         {
             Debug.Log($"{InputDebug.Prefix} {LogPrefix} side={side} ATTACH layer={layerLabel} collider={hit.collider.name} point={hit.point} normal={hit.normal} storedPos={attachedWorldPosition} storedRot={attachedWorldRotation.eulerAngles}");
         }
+
+        ForceAttachedTargetPose();
     }
 
     public void Detach()
@@ -167,6 +175,7 @@ public sealed class FootAttachmentController : MonoBehaviour
             Debug.Log($"{InputDebug.Prefix} {LogPrefix} side={side} DETACH attached={isAttached} collider={attachedCollider?.name ?? "<none>"} storedPos={attachedWorldPosition} storedRot={attachedWorldRotation.eulerAngles}");
         }
         isAttached = false;
+        _hasAttachedKneeHintPosition = false;
         attachedCollider = null;
     }
 
@@ -195,6 +204,27 @@ public sealed class FootAttachmentController : MonoBehaviour
         {
             Gizmos.color = Color.cyan;
             Gizmos.DrawWireSphere(attachedWorldPosition, probeRadius);
+        }
+    }
+
+    public void ForceAttachedTargetPose()
+    {
+        if (!IsAttached)
+        {
+            return;
+        }
+
+        if (footIkTarget != null)
+        {
+            footIkTarget.SetPositionAndRotation(
+                AttachedWorldPosition,
+                AttachedWorldRotation
+            );
+        }
+
+        if (kneeHint != null && _hasAttachedKneeHintPosition)
+        {
+            kneeHint.position = _attachedKneeHintWorldPosition;
         }
     }
 }

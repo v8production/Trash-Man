@@ -208,15 +208,12 @@ public sealed class TitanLegAnchorResolver : MonoBehaviour
             return;
         }
 
-        WorldPose hipPose = WorldPose.Capture(anchoredHip);
-        WorldPose kneePose = WorldPose.Capture(anchoredKnee);
-        WorldPose footPose = WorldPose.Capture(anchoredFoot);
+        Vector3 fixedHipPosition = anchoredHip.position;
 
         float inverseYaw = Mathf.Clamp(-hipYawDelta * inverseYawScale, -3f, 3f);
         float inverseRoll = Mathf.Clamp(-hipRollDelta * inverseRollScale, -3f, 3f);
 
         Vector3 rollAxis = Vector3.ProjectOnPlane(anchoredHip.forward, Vector3.up);
-
         if (rollAxis.sqrMagnitude < 0.0001f)
         {
             rollAxis = movementRoot.forward;
@@ -226,7 +223,7 @@ public sealed class TitanLegAnchorResolver : MonoBehaviour
         Quaternion rollRotation = Quaternion.AngleAxis(inverseRoll, rollAxis.normalized);
         Quaternion combinedRotation = yawRotation * rollRotation;
 
-        Vector3 pivot = hipPose.Position;
+        Vector3 pivot = fixedHipPosition;
         Vector3 rootOffset = movementRoot.position - pivot;
 
         Vector3 nextRootPosition = pivot + combinedRotation * rootOffset;
@@ -238,13 +235,16 @@ public sealed class TitanLegAnchorResolver : MonoBehaviour
             zeroVelocities: false
         );
 
-        _pendingHip = anchoredHip;
-        _pendingKnee = anchoredKnee;
-        _pendingFoot = anchoredFoot;
-        _pendingHipPose = hipPose;
-        _pendingKneePose = kneePose;
-        _pendingFootPose = footPose;
-        _hasPendingAnchoredLegPose = true;
+        Vector3 hipCorrection = fixedHipPosition - anchoredHip.position;
+
+        Managers.TitanRig.ApplyMovementRootPose(
+            movementRoot.position + hipCorrection,
+            movementRoot.rotation,
+            zeroVelocities: false
+        );
+
+        anchor.ForceAttachedTargetPose();
+
         _skipAnchorStabilizationThisFrame = true;
     }
 
