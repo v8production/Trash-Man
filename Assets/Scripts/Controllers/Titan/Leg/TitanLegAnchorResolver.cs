@@ -302,56 +302,38 @@ public sealed class TitanLegAnchorResolver : MonoBehaviour
         Managers.TitanRig.ApplyMovementRootPose(lockedRootPosition, lockedRootRotation, zeroVelocities);
     }
 
-    private void ApplySingleAnchorLock(FootAttachmentController attachment, float deltaTime, bool zeroBodyVelocityWhenLocked)
+    private void ApplySingleAnchorLock(
+        FootAttachmentController attachment,
+        float deltaTime,
+        bool zeroBodyVelocityWhenLocked)
     {
         Transform movableRoot = Managers.TitanRig.MovementRoot;
-        if (movableRoot == null || attachment == null || !attachment.IsAttached || attachment.FootTransform == null)
+
+        if (movableRoot == null || attachment == null || !attachment.IsAttached)
         {
             return;
         }
 
+        attachment.ForceAttachedTargetPose();
+
         Vector3 desiredPivot = attachment.AttachedWorldPosition;
         Vector3 currentPivot = attachment.GetCurrentContactPoint();
-        Quaternion nextRotation = movableRoot.rotation;
 
-        Vector3 currentForward = Vector3.ProjectOnPlane(attachment.FootTransform.forward, Vector3.up);
-        Vector3 desiredForward = Vector3.ProjectOnPlane(attachment.AttachedWorldRotation * Vector3.forward, Vector3.up);
-        if (currentForward.sqrMagnitude > 0.0001f && desiredForward.sqrMagnitude > 0.0001f)
-        {
-            float yawDelta = Vector3.SignedAngle(currentForward, desiredForward, Vector3.up) * singleFootYawCorrectionScale;
-            if (Mathf.Abs(yawDelta) > singleFootYawDeadZoneDegrees)
-            {
-                float blend = 1f - Mathf.Exp(-Mathf.Max(0.01f, singleFootYawCorrectionSpeed) * Mathf.Max(0f, deltaTime));
-                float step = yawDelta * blend;
-                float maxStep = Mathf.Max(0f, singleFootMaxYawCorrectionDegreesPerFrame);
-                if (maxStep > 0.0001f)
-                {
-                    step = Mathf.Clamp(step, -maxStep, maxStep);
-                }
+        Vector3 translationDelta = Vector3.ProjectOnPlane(
+            desiredPivot - currentPivot,
+            Vector3.up
+        );
 
-                if (Mathf.Abs(step) < 0.0001f)
-                {
-                    step = Mathf.Sign(yawDelta) * 0.0001f;
-                }
-
-                Quaternion yawRotation = Quaternion.AngleAxis(step, Vector3.up);
-                Vector3 rotatedPosition = desiredPivot + (yawRotation * (movableRoot.position - desiredPivot));
-                nextRotation = yawRotation * nextRotation;
-                Managers.TitanRig.ApplyMovementRootPose(rotatedPosition, nextRotation, zeroBodyVelocityWhenLocked);
-                currentPivot = attachment.GetCurrentContactPoint();
-            }
-        }
-
-        // Only correct planar translation.
-        // Vertical correction based on a probe point is unstable (probe may not be at the sole),
-        // and can push the whole titan into/under the floor when roles switch or IK jitters.
-        Vector3 translationDelta = Vector3.ProjectOnPlane(desiredPivot - currentPivot, Vector3.up);
         if (translationDelta.sqrMagnitude <= 0.0000001f)
         {
             return;
         }
 
-        Managers.TitanRig.ApplyMovementRootPose(movableRoot.position + translationDelta, movableRoot.rotation, zeroBodyVelocityWhenLocked);
+        Managers.TitanRig.ApplyMovementRootPose(
+            movableRoot.position + translationDelta,
+            movableRoot.rotation,
+            zeroBodyVelocityWhenLocked
+        );
     }
 
     private void ApplyDualAnchorLock(bool zeroVelocities)
