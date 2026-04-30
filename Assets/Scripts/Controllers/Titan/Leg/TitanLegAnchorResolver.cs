@@ -235,14 +235,6 @@ public sealed class TitanLegAnchorResolver : MonoBehaviour
             zeroVelocities: false
         );
 
-        Vector3 hipCorrection = fixedHipPosition - anchoredHip.position;
-
-        Managers.TitanRig.ApplyMovementRootPose(
-            movementRoot.position + hipCorrection,
-            movementRoot.rotation,
-            zeroVelocities: false
-        );
-
         anchor.ForceAttachedTargetPose();
 
         _skipAnchorStabilizationThisFrame = true;

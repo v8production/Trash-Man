@@ -165,6 +165,12 @@ public sealed class FootAttachmentController : MonoBehaviour
             Debug.Log($"{InputDebug.Prefix} {LogPrefix} side={side} ATTACH layer={layerLabel} collider={hit.collider.name} point={hit.point} normal={hit.normal} storedPos={attachedWorldPosition} storedRot={attachedWorldRotation.eulerAngles}");
         }
 
+        if (kneeHint != null)
+        {
+            _attachedKneeHintWorldPosition = kneeHint.position;
+            _hasAttachedKneeHintPosition = true;
+        }
+
         ForceAttachedTargetPose();
     }
 
