@@ -28,10 +28,12 @@ public class GrolarController : BossController
     private Animator _animator;
     private Coroutine _tempAnimRoutine;
     private int _tempAnimIndex;
+    private BossStat _stat;
 
     private void Awake()
     {
         _animator = GetComponentInChildren<Animator>(true);
+        _stat = gameObject.GetComponent<BossStat>();
     }
 
     private void OnEnable()

@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.InputSystem;
 
 public class GameScene : BaseScene
 {
@@ -8,6 +9,11 @@ public class GameScene : BaseScene
     private static readonly Quaternion GrolarSpawnRotation = Quaternion.Euler(0f, 180f, 0f);
     private TitanController _titanController;
     private TitanRoleNetworkDriver _titanRoleDriver;
+    private GrolarController _grolarController;
+
+    private UI_Boss _bossUi;
+    private UI_TitanStat _titanStatUi;
+    private UI_GameMenu _gameMenuUi;
 
     private static void LoadManagers()
     {
@@ -50,10 +56,10 @@ public class GameScene : BaseScene
         }
     }
 
-    private static void EnsureGrolarRuntime()
+    private void EnsureGrolarRuntime()
     {
-        GrolarController grolarController = FindAnyObjectByType<GrolarController>();
-        if (grolarController != null)
+        _grolarController = FindAnyObjectByType<GrolarController>();
+        if (_grolarController != null)
             return;
 
         GameObject grolarObject = GameObject.Find(GrolarPrefabName);
@@ -67,6 +73,46 @@ public class GameScene : BaseScene
         }
 
         grolarObject.transform.SetPositionAndRotation(GrolarSpawnPosition, GrolarSpawnRotation);
+
+        _grolarController = grolarObject.GetComponent<GrolarController>();
+    }
+
+    private void EnsureBossUI()
+    {
+        if (_bossUi != null)
+            return;
+
+        _bossUi = Managers.UI.ShowSceneUI<UI_Boss>(nameof(UI_Boss));
+    }
+
+    private void EnsureTitanStatUI()
+    {
+        if (_titanStatUi != null)
+            return;
+
+        _titanStatUi = Managers.UI.ShowSceneUI<UI_TitanStat>(nameof(UI_TitanStat));
+    }
+
+    private void EnsureGameMenuUI()
+    {
+        if (_gameMenuUi != null)
+            return;
+
+        _gameMenuUi = Managers.UI.ShowSceneUI<UI_GameMenu>(nameof(UI_GameMenu));
+        if (_gameMenuUi != null)
+            _gameMenuUi.gameObject.SetActive(false);
+    }
+
+    private void MapStatsToUIs()
+    {
+        EnsureBossUI();
+        EnsureTitanStatUI();
+
+        if (_bossUi != null && _grolarController != null)
+            _bossUi.SetStat(_grolarController.GetComponent<BossStat>());
+
+        if (_titanStatUi != null && _titanController != null)
+            _titanStatUi.SetStat(_titanController.GetComponent<TitanStat>());
     }
 
     protected override void Init()
@@ -79,8 +125,36 @@ public class GameScene : BaseScene
         LoadManagers();
         EnsureTitanRuntime();
         EnsureGrolarRuntime();
+        EnsureBossUI();
+        EnsureTitanStatUI();
+        EnsureGameMenuUI();
+        MapStatsToUIs();
         CleanupLobbyRangers();
         Managers.Input.SetMode(Define.InputMode.Player);
+    }
+
+    private void Update()
+    {
+        if (!IsEscapePressedThisFrame())
+            return;
+
+        ToggleGameMenu();
+    }
+
+    private void ToggleGameMenu()
+    {
+        EnsureGameMenuUI();
+        if (_gameMenuUi == null)
+            return;
+
+        bool shouldShow = !_gameMenuUi.gameObject.activeSelf;
+        _gameMenuUi.gameObject.SetActive(shouldShow);
+        Managers.Input.SetMode(shouldShow ? Define.InputMode.UI : Define.InputMode.Player);
+    }
+
+    private static bool IsEscapePressedThisFrame()
+    {
+        return Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame;
     }
 
     private static void CleanupLobbyRangers()
@@ -102,5 +176,9 @@ public class GameScene : BaseScene
     {
         _titanController = null;
         _titanRoleDriver = null;
+        _grolarController = null;
+        _bossUi = null;
+        _titanStatUi = null;
+        _gameMenuUi = null;
     }
 }

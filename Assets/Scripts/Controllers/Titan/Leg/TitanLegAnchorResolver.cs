@@ -43,7 +43,6 @@ public sealed class TitanLegAnchorResolver : MonoBehaviour
     [Header("Inverse Movement")]
     [SerializeField] private float inverseYawScale = 1f;
     [SerializeField] private float inverseRollScale = 0.75f;
-    [SerializeField] private float inverseMouseDeltaTranslationScale = 0.0025f;
 
     [Header("Anchor Stabilization")]
     [SerializeField] private float singleFootYawCorrectionScale = 1f;

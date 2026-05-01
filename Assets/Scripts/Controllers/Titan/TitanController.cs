@@ -14,12 +14,15 @@ public class TitanController : MonoBehaviour
     [SerializeField] private TitanLeftLegRoleController leftLegController;
     [SerializeField] private TitanRightLegRoleController rightLegController;
 
+    TitanStat _stat;
+
     private void Awake()
     {
         if (attachControllersOnAwake)
         {
             EnsureInitialized();
         }
+        _stat = gameObject.GetComponent<TitanStat>();
     }
 
     public void EnsureInitialized()

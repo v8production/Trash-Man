@@ -1519,6 +1519,7 @@ GameObject:
   - component: {fileID: 7326794753873963898}
   - component: {fileID: 3696942745351860480}
   - component: {fileID: 3420161508291642738}
+  - component: {fileID: 2933525441443845699}
   m_Layer: 0
   m_Name: Grolar
   m_TagString: Untagged
@@ -1581,6 +1582,21 @@ MonoBehaviour:
   tempAnimIntervalSeconds: 3
   tempUseCrossFade: 1
   tempCrossFadeDuration: 0.05
+--- !u!114 &2933525441443845699
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7991023663059710400}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2b1c6532b34dad445af271192f2ef9f0, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::BossStat
+  _hp: 100
+  _maxHp: 100
+  _attack: 10
 --- !u!1 &8270459368633991506
 GameObject:
   m_ObjectHideFlags: 0

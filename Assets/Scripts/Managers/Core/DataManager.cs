@@ -7,9 +7,9 @@ public class DataManager
 
     public void Init()
     {
-        Data.HumanRouteData humanRouteData = LoadJson<Data.HumanRouteData, string, List<Vector3>>("HumanRouteData");
-        if (humanRouteData != null)
-            HumanRouteDict = humanRouteData.MakeDict();
+        // Data.HumanRouteData humanRouteData = LoadJson<Data.HumanRouteData, string, List<Vector3>>("HumanRouteData");
+        // if (humanRouteData != null)
+        //     HumanRouteDict = humanRouteData.MakeDict();
     }
 
     private Loader LoadJson<Loader, Key, Value>(string path) where Loader : ILoader<Key, Value>

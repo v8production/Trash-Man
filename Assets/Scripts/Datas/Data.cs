@@ -12,33 +12,23 @@ namespace Data
     [Serializable]
     public class Stat
     {
+        public string title;
+        public string subtitle;
         public int maxHp;
         public int currentHp;
-        public int gaize;
+        public int gauge;
     }
 
     [Serializable]
-    public class HumanRoute
+    public class StatData : ILoader<string, Stat>
     {
-        public string name;
-        public List<Vector3> positions = new();
-    }
+        public List<Stat> stats = new();
 
-    [Serializable]
-    public class HumanRouteData : ILoader<string, List<Vector3>>
-    {
-        public List<HumanRoute> routes = new();
-
-        public Dictionary<string, List<Vector3>> MakeDict()
+        public Dictionary<string, Stat> MakeDict()
         {
-            Dictionary<string, List<Vector3>> dict = new();
-            foreach (HumanRoute route in routes)
-            {
-                if (string.IsNullOrWhiteSpace(route.name) || route.positions == null)
-                    continue;
-
-                dict[route.name] = route.positions;
-            }
+            Dictionary<string, Stat> dict = new();
+            foreach (Stat stat in stats)
+                dict.Add(stat.title, stat);
             return dict;
         }
     }
