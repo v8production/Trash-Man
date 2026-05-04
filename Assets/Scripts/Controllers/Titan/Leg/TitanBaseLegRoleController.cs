@@ -96,7 +96,14 @@ public abstract class TitanBaseLegRoleController : TitanBaseController
         if (legAnchorResolver != null &&
             legAnchorResolver.TryApplyAnchoredMovement(command.Side, command, state, deltaTime))
         {
-            ApplyLegJointInputs(ref state, command, deltaTime);
+            Transform anchoredKnee = IsLeftLeg ? Managers.TitanRig.LeftKnee : Managers.TitanRig.RightKnee;
+            Transform anchoredFoot = IsLeftLeg ? Managers.TitanRig.LeftFoot : Managers.TitanRig.RightFoot;
+            Vector3 kneeBeforePosition = anchoredKnee != null ? anchoredKnee.position : Vector3.zero;
+            Quaternion kneeBeforeRotation = anchoredKnee != null ? anchoredKnee.rotation : Quaternion.identity;
+            Vector3 footBeforePosition = anchoredFoot != null ? anchoredFoot.position : Vector3.zero;
+            Quaternion footBeforeRotation = anchoredFoot != null ? anchoredFoot.rotation : Quaternion.identity;
+
+            ApplyLegJointInputs(ref state, command, deltaTime, out float kneeDelta, out float ankleDelta);
             Managers.TitanRig.SetLegState(left: IsLeftLeg, state);
             Managers.TitanRig.ApplyLegPose(left: IsLeftLeg);
 
@@ -104,6 +111,16 @@ public abstract class TitanBaseLegRoleController : TitanBaseController
             {
                 return;
             }
+
+            legAnchorResolver.ApplyInverseRootFromAnchoredJointDeltas(
+                command.Side,
+                kneeDelta,
+                ankleDelta,
+                kneeBeforePosition,
+                kneeBeforeRotation,
+                footBeforePosition,
+                footBeforeRotation
+            );
 
             if (roleActivated)
             {
@@ -131,7 +148,7 @@ public abstract class TitanBaseLegRoleController : TitanBaseController
         state.HipYaw = Mathf.Clamp(state.HipYaw, hipYawLimit.x, hipYawLimit.y);
         state.HipRoll = Mathf.Clamp(state.HipRoll, hipRollLimit.x, hipRollLimit.y);
 
-        ApplyLegJointInputs(ref state, command, deltaTime);
+        ApplyLegJointInputs(ref state, command, deltaTime, out _, out _);
 
         Managers.TitanRig.SetLegState(left: IsLeftLeg, state);
         Managers.TitanRig.ApplyLegPose(left: IsLeftLeg);
@@ -276,19 +293,27 @@ public abstract class TitanBaseLegRoleController : TitanBaseController
         };
     }
 
-    private void ApplyLegJointInputs(ref TitanLegControlState state, in TitanLegInputCommand command, float deltaTime)
+    private void ApplyLegJointInputs(ref TitanLegControlState state, in TitanLegInputCommand command, float deltaTime, out float kneeDelta, out float ankleDelta)
     {
-        state.KneeRoll = Mathf.Clamp(
-            state.KneeRoll + (command.KneeInput * kneeSpeed * deltaTime),
+        float previousKnee = state.KneeRoll;
+        float previousAnkle = state.AnkleRoll;
+
+        float nextKnee = Mathf.Clamp(
+            previousKnee + (command.KneeInput * kneeSpeed * deltaTime),
             kneeRollLimit.x,
             kneeRollLimit.y
         );
 
-        state.AnkleRoll = Mathf.Clamp(
-            state.AnkleRoll + (command.AnkleInput * ankleSpeed * deltaTime),
+        float nextAnkle = Mathf.Clamp(
+            previousAnkle + (command.AnkleInput * ankleSpeed * deltaTime),
             ankleRollLimit.x,
             ankleRollLimit.y
         );
+
+        state.KneeRoll = nextKnee;
+        state.AnkleRoll = nextAnkle;
+        kneeDelta = nextKnee - previousKnee;
+        ankleDelta = nextAnkle - previousAnkle;
     }
 
     private float ApplyGravityTorque(

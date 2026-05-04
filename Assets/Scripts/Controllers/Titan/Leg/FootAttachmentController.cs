@@ -16,7 +16,7 @@ public sealed class FootAttachmentController : MonoBehaviour
     [SerializeField] private float probeRadius = 0.08f;
     [SerializeField] private float probeDistance = 0.18f;
     [SerializeField] private float probeStartOffset = 0.05f;
-    [SerializeField] private float maxAttachPlaneAngle = 1f;
+    [SerializeField] private float maxAttachPlaneAngle = 10f;
     [SerializeField] private bool drawDebugGizmos;
     [SerializeField] private bool logAttachDetachTransitions = true;
 
@@ -167,7 +167,8 @@ public sealed class FootAttachmentController : MonoBehaviour
         string layerLabel = string.IsNullOrWhiteSpace(layerName) ? layer.ToString() : $"{layerName}({layer})";
         if (logAttachDetachTransitions)
         {
-            Debug.Log($"{InputDebug.Prefix} {LogPrefix} side={side} ATTACH layer={layerLabel} collider={hit.collider.name} point={hit.point} normal={hit.normal} storedPos={attachedWorldPosition} storedRot={attachedWorldRotation.eulerAngles}");
+            float planeAngle = GetAttachPlaneAngle(hit);
+            Debug.Log($"{InputDebug.Prefix} {LogPrefix} ATTACH_SUCCESS side={side} layer={layerLabel} collider={hit.collider.name} point={hit.point} normal={hit.normal} planeAngle={planeAngle:F2}/{maxAttachPlaneAngle:F2} probe={probe.name} foot={foot.name} storedPos={attachedWorldPosition} storedRot={attachedWorldRotation.eulerAngles}");
         }
     }
 
@@ -193,6 +194,23 @@ public sealed class FootAttachmentController : MonoBehaviour
         float alignment = Mathf.Abs(Vector3.Dot(footSoleNormal.normalized, hit.normal.normalized));
         float minAlignment = Mathf.Cos(Mathf.Clamp(maxAttachPlaneAngle, 0f, 90f) * Mathf.Deg2Rad);
         return alignment >= minAlignment;
+    }
+
+    private float GetAttachPlaneAngle(in RaycastHit hit)
+    {
+        Transform foot = footTransform != null ? footTransform : BottomProbe;
+        if (foot == null || hit.normal.sqrMagnitude < 0.0001f)
+        {
+            return 180f;
+        }
+
+        Vector3 footSoleNormal = -foot.up;
+        if (footSoleNormal.sqrMagnitude < 0.0001f)
+        {
+            return 180f;
+        }
+
+        return Vector3.Angle(footSoleNormal.normalized, hit.normal.normalized);
     }
 
     public void Detach()

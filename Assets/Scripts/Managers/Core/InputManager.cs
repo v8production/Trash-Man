@@ -248,6 +248,6 @@ public class InputManager
             return;
 
         _nextTitanInputLogTime = Time.unscaledTime + TitanInputLogIntervalSeconds;
-        InputDebug.Log($"Managers.Input arrows(fwd={input.BodyForward}, strafe={input.BodyStrafe}) turn={input.BodyTurn} waist(A/D)={input.BodyWaist} ws(W/S)={input.LeftArmElbow} ankle(Shift+W/S)={input.LeftLegAnkle}");
+        // InputDebug.Log($"Managers.Input arrows(fwd={input.BodyForward}, strafe={input.BodyStrafe}) turn={input.BodyTurn} waist(A/D)={input.BodyWaist} ws(W/S)={input.LeftArmElbow} ankle(Shift+W/S)={input.LeftLegAnkle}");
     }
 }

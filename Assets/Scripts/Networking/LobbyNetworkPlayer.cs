@@ -244,7 +244,9 @@ public class LobbyNetworkPlayer : NetworkBehaviour
             || Mathf.Abs(snapshot.BodyStrafe) > 0.001f
             || Mathf.Abs(snapshot.BodyTurn) > 0.001f;
         if (hasInput)
-            InputDebug.Log($"[ServerRpc] SubmitRoleInputServerRpc from client={OwnerClientId} waist={snapshot.BodyWaist} ws={snapshot.LeftArmElbow} fwd={snapshot.BodyForward} strafe={snapshot.BodyStrafe}");
+        {
+            // InputDebug.Log($"[ServerRpc] SubmitRoleInputServerRpc from client={OwnerClientId} waist={snapshot.BodyWaist} ws={snapshot.LeftArmElbow} fwd={snapshot.BodyForward} strafe={snapshot.BodyStrafe}");
+        }
         _roleInput.Value = inputPayload;
     }
 

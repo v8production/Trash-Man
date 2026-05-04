@@ -16,7 +16,7 @@ public sealed class TitanLegAnchorResolver : MonoBehaviour
         public readonly Vector3 Position;
         public readonly Quaternion Rotation;
 
-        private WorldPose(Vector3 position, Quaternion rotation)
+        public WorldPose(Vector3 position, Quaternion rotation)
         {
             Position = position;
             Rotation = rotation;
@@ -250,6 +250,93 @@ public sealed class TitanLegAnchorResolver : MonoBehaviour
         _pendingFootPose = footPose;
         _hasPendingAnchoredLegPose = true;
         _skipAnchorStabilizationThisFrame = true;
+    }
+
+    public void ApplyInverseRootFromAnchoredJointDeltas(
+        TitanBaseLegRoleController.LegSide side,
+        float kneeDelta,
+        float ankleDelta,
+        Vector3 kneeBeforePosition,
+        Quaternion kneeBeforeRotation,
+        Vector3 footBeforePosition,
+        Quaternion footBeforeRotation)
+    {
+        ResolveReferences();
+
+        if (!Managers.TitanRig.EnsureReady())
+        {
+            return;
+        }
+
+        AnchorMode mode = GetAnchorMode();
+        if (mode == AnchorMode.Locked)
+        {
+            return;
+        }
+
+        bool isLeft = side == TitanBaseLegRoleController.LegSide.Left;
+        if ((isLeft && mode != AnchorMode.LeftAnchored) ||
+            (!isLeft && mode != AnchorMode.RightAnchored))
+        {
+            return;
+        }
+
+        Transform movementRoot = Managers.TitanRig.MovementRoot;
+        Transform anchoredKnee = isLeft ? Managers.TitanRig.LeftKnee : Managers.TitanRig.RightKnee;
+        Transform anchoredFoot = isLeft ? Managers.TitanRig.LeftFoot : Managers.TitanRig.RightFoot;
+        if (movementRoot == null || anchoredFoot == null)
+        {
+            return;
+        }
+
+        bool appliedJointDelta = false;
+        bool shouldRestoreKnee = false;
+
+        if (Mathf.Abs(ankleDelta) > 0.001f)
+        {
+            Vector3 ankleAxis = footBeforeRotation * Vector3.forward;
+            if (ankleAxis.sqrMagnitude > 0.0001f)
+            {
+                Quaternion ankleRotation = Quaternion.AngleAxis(-ankleDelta, ankleAxis.normalized);
+                ApplyRootRotationAroundPivot(movementRoot, footBeforePosition, ankleRotation);
+                appliedJointDelta = true;
+            }
+        }
+
+        if (anchoredKnee != null && Mathf.Abs(kneeDelta) > 0.001f)
+        {
+            Vector3 kneeAxis = kneeBeforeRotation * Vector3.forward;
+            if (kneeAxis.sqrMagnitude > 0.0001f)
+            {
+                Quaternion kneeRotation = Quaternion.AngleAxis(-kneeDelta, kneeAxis.normalized);
+                ApplyRootRotationAroundPivot(movementRoot, kneeBeforePosition, kneeRotation);
+                appliedJointDelta = true;
+                shouldRestoreKnee = true;
+            }
+        }
+
+        if (!appliedJointDelta)
+        {
+            return;
+        }
+
+        _pendingKnee = shouldRestoreKnee ? anchoredKnee : null;
+        _pendingFoot = anchoredFoot;
+        if (shouldRestoreKnee)
+        {
+            _pendingKneePose = new WorldPose(kneeBeforePosition, kneeBeforeRotation);
+        }
+        _pendingFootPose = new WorldPose(footBeforePosition, footBeforeRotation);
+        _pendingHip = null;
+        _hasPendingAnchoredLegPose = true;
+        _skipAnchorStabilizationThisFrame = true;
+    }
+
+    private static void ApplyRootRotationAroundPivot(Transform movementRoot, Vector3 pivot, Quaternion rotation)
+    {
+        Vector3 nextPosition = pivot + (rotation * (movementRoot.position - pivot));
+        Quaternion nextRotation = rotation * movementRoot.rotation;
+        Managers.TitanRig.ApplyMovementRootPose(nextPosition, nextRotation, zeroVelocities: false);
     }
 
     public void StabilizeNow(float deltaTime)
