@@ -17,7 +17,7 @@ public class TitanController : MonoBehaviour
     TitanStat _stat;
     public TitanStat Stat { get { return _stat; } }
 
-    bool _guard = true;
+    bool _guard = false;
 
     public bool Guard { get { return _guard; } set { _guard = value; } }
 

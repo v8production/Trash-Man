@@ -33,6 +33,8 @@ public abstract class TitanBaseLegRoleController : TitanBaseController
     [SerializeField] private bool gravitySagEnabled = true;
     [SerializeField] private float gravityTorqueToDegrees = 4f;
     [SerializeField] private float maxGravitySagDegreesPerSecond = 45f;
+    [SerializeField] private float gravityTorqueDeadZoneDegreesPerSecond = 0.05f;
+    [SerializeField] private float minRootUprightForGravitySag = 0.25f;
     [SerializeField] private Vector3 footCenterOfMassLocalOffset = new(0f, 0f, 0.18f);
     [SerializeField] private float footMass = 1f;
     [SerializeField] private float calfMass = 1f;
@@ -203,6 +205,13 @@ public abstract class TitanBaseLegRoleController : TitanBaseController
         Transform foot = IsLeftLeg ? Managers.TitanRig.LeftFoot : Managers.TitanRig.RightFoot;
         Transform root = Managers.TitanRig.MovementRoot;
         Transform spine = Managers.TitanRig.Spine;
+        float gravitySagScale = ComputeGravitySagScale(root);
+        if (gravitySagScale <= 0f)
+        {
+            _gravityFullyLimited = false;
+            return;
+        }
+
         bool hipLimited = false;
         bool kneeLimited = false;
         bool ankleLimited = false;
@@ -213,6 +222,7 @@ public abstract class TitanBaseLegRoleController : TitanBaseController
             hip,
             hip != null ? hip.forward : Vector3.forward,
             deltaTime,
+            gravitySagScale,
             ref hipLimited,
             WeightedCenter(
                 SegmentCenter(hip, knee), thighMass,
@@ -227,6 +237,7 @@ public abstract class TitanBaseLegRoleController : TitanBaseController
             knee,
             knee != null ? knee.forward : Vector3.forward,
             deltaTime,
+            gravitySagScale,
             ref kneeLimited,
             WeightedCenter(
                 SegmentCenter(knee, foot), calfMass,
@@ -238,6 +249,7 @@ public abstract class TitanBaseLegRoleController : TitanBaseController
             foot,
             foot != null ? foot.forward : Vector3.forward,
             deltaTime,
+            gravitySagScale,
             ref ankleLimited,
             WeightedCenter(FootCenter(foot), footMass));
 
@@ -322,10 +334,11 @@ public abstract class TitanBaseLegRoleController : TitanBaseController
         Transform joint,
         Vector3 worldAxis,
         float deltaTime,
+        float gravitySagScale,
         ref bool limitedByGravity,
         WeightedPoint weightedPoint)
     {
-        if (joint == null || weightedPoint.Mass <= 0f || worldAxis.sqrMagnitude < 0.0001f)
+        if (joint == null || weightedPoint.Mass <= 0f || worldAxis.sqrMagnitude < 0.0001f || gravitySagScale <= 0f)
         {
             return Mathf.Clamp(current, limit.x, limit.y);
         }
@@ -333,8 +346,20 @@ public abstract class TitanBaseLegRoleController : TitanBaseController
         Vector3 lever = weightedPoint.Position - joint.position;
         Vector3 gravityForce = Physics.gravity * weightedPoint.Mass;
         float torque = Vector3.Dot(worldAxis.normalized, Vector3.Cross(lever, gravityForce));
+        float degreesPerSecond = torque * gravityTorqueToDegrees * gravitySagScale;
+        if (Mathf.Abs(degreesPerSecond) <= gravityTorqueDeadZoneDegreesPerSecond)
+        {
+            return Mathf.Clamp(current, limit.x, limit.y);
+        }
+
         float maxStep = maxGravitySagDegreesPerSecond * Mathf.Max(0f, deltaTime);
-        float step = Mathf.Clamp(torque * gravityTorqueToDegrees * Mathf.Max(0f, deltaTime), -maxStep, maxStep);
+        float step = Mathf.Clamp(degreesPerSecond * Mathf.Max(0f, deltaTime), -maxStep, maxStep);
+        step = ClampToDownwardCenterOfMassMotion(joint, worldAxis, weightedPoint.Position, step);
+        if (Mathf.Abs(step) <= 0.0001f)
+        {
+            return Mathf.Clamp(current, limit.x, limit.y);
+        }
+
         float unclamped = current + step;
         float clamped = Mathf.Clamp(unclamped, limit.x, limit.y);
 
@@ -344,6 +369,34 @@ public abstract class TitanBaseLegRoleController : TitanBaseController
         }
 
         return clamped;
+    }
+
+    private static float ClampToDownwardCenterOfMassMotion(Transform joint, Vector3 worldAxis, Vector3 centerOfMass, float step)
+    {
+        Vector3 axis = worldAxis.normalized;
+        Vector3 lever = centerOfMass - joint.position;
+        float currentHeight = centerOfMass.y;
+        float nextHeight = (joint.position + (Quaternion.AngleAxis(step, axis) * lever)).y;
+
+        if (nextHeight <= currentHeight + 0.0001f)
+        {
+            return step;
+        }
+
+        float oppositeStep = -step;
+        float oppositeHeight = (joint.position + (Quaternion.AngleAxis(oppositeStep, axis) * lever)).y;
+        return oppositeHeight <= currentHeight + 0.0001f ? oppositeStep : 0f;
+    }
+
+    private float ComputeGravitySagScale(Transform root)
+    {
+        if (root == null)
+        {
+            return 1f;
+        }
+
+        float upright = Mathf.Abs(Vector3.Dot(root.up.normalized, Vector3.up));
+        return Mathf.InverseLerp(Mathf.Clamp01(minRootUprightForGravitySag), 1f, upright);
     }
 
     private Vector3 FootCenter(Transform foot)

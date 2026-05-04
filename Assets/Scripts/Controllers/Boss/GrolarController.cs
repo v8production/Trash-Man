@@ -185,7 +185,7 @@ public class GrolarController : BossController
         transform.position = nextPos;
 
         Vector3 titanPos = _titanRoot.position;
-        Vector3 tangent = Vector3.Cross(Vector3.up, (nextPos - titanPos)).normalized;
+        Vector3 tangent = Vector3.Cross((nextPos - titanPos), Vector3.up).normalized;
         if (dir < 0)
             tangent = -tangent;
         SetDesiredRotationFromDirection(tangent);

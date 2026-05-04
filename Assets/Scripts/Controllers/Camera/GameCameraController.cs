@@ -9,6 +9,10 @@ public class GameCameraController : MonoBehaviour
 
     [Header("Framing")]
     [SerializeField] private Vector3 _titanPivotOffset = new(0f, 1f, 0f);
+    [SerializeField] private bool _useDynamicTitanHeight = true;
+    [SerializeField] private float _dynamicHeightWeight = 0.75f;
+    [SerializeField] private float _dynamicHeightLerpSpeed = 10f;
+    [SerializeField] private float _minimumPivotHeightAboveRoot = 0.25f;
     [SerializeField] private Vector3 _bossLookOffset = new(0f, 0.5f, 0f);
     [SerializeField] private float _followDistance = 2f;
     [SerializeField] private float _heightOffset = 0f;
@@ -21,6 +25,9 @@ public class GameCameraController : MonoBehaviour
     [Header("Fallback")]
     [SerializeField] private Vector3 _fallbackForward = Vector3.forward;
     [SerializeField] private float _minimumPlanarDistance = 0.25f;
+
+    private float _smoothedDynamicPivotY;
+    private bool _hasSmoothedDynamicPivotY;
 
     private void OnEnable()
     {
@@ -85,7 +92,7 @@ public class GameCameraController : MonoBehaviour
         if (_titanTarget == null)
             return false;
 
-        Vector3 titanPivot = _titanTarget.position + _titanPivotOffset;
+        Vector3 titanPivot = ResolveTitanPivot();
         Vector3 titanForward = ResolvePlanarForward(titanPivot);
         Vector3 desiredLookPoint = ResolveLookPoint(titanPivot);
 
@@ -125,5 +132,75 @@ public class GameCameraController : MonoBehaviour
         Vector3 bossPivot = _bossTarget.transform.position + _bossLookOffset;
         float bossWeight = Mathf.Clamp01(_lookAtBossWeight);
         return Vector3.Lerp(titanPivot, bossPivot, bossWeight);
+    }
+
+    private Vector3 ResolveTitanPivot()
+    {
+        Vector3 basePivot = _titanTarget.position + _titanPivotOffset;
+        if (!_useDynamicTitanHeight || !TryGetDynamicTitanPivotY(basePivot.y, out float dynamicPivotY))
+        {
+            return basePivot;
+        }
+
+        float weight = Mathf.Clamp01(_dynamicHeightWeight);
+        float targetY = Mathf.Lerp(basePivot.y, dynamicPivotY, weight);
+        if (!_hasSmoothedDynamicPivotY)
+        {
+            _smoothedDynamicPivotY = targetY;
+            _hasSmoothedDynamicPivotY = true;
+        }
+        else
+        {
+            float t = 1f - Mathf.Exp(-Mathf.Max(0.01f, _dynamicHeightLerpSpeed) * Time.deltaTime);
+            _smoothedDynamicPivotY = Mathf.Lerp(_smoothedDynamicPivotY, targetY, t);
+        }
+
+        basePivot.y = _smoothedDynamicPivotY;
+        return basePivot;
+    }
+
+    private bool TryGetDynamicTitanPivotY(float fallbackY, out float pivotY)
+    {
+        pivotY = fallbackY;
+
+        float minY = float.PositiveInfinity;
+        float maxY = float.NegativeInfinity;
+        int count = 0;
+
+        IncludeTransformHeight(_titanTarget, ref minY, ref maxY, ref count);
+        IncludeTransformHeight(Managers.TitanRig.Spine, ref minY, ref maxY, ref count);
+        IncludeTransformHeight(Managers.TitanRig.LeftShoulder, ref minY, ref maxY, ref count);
+        IncludeTransformHeight(Managers.TitanRig.LeftElbow, ref minY, ref maxY, ref count);
+        IncludeTransformHeight(Managers.TitanRig.RightShoulder, ref minY, ref maxY, ref count);
+        IncludeTransformHeight(Managers.TitanRig.RightElbow, ref minY, ref maxY, ref count);
+        IncludeTransformHeight(Managers.TitanRig.LeftHip, ref minY, ref maxY, ref count);
+        IncludeTransformHeight(Managers.TitanRig.LeftKnee, ref minY, ref maxY, ref count);
+        IncludeTransformHeight(Managers.TitanRig.LeftFoot, ref minY, ref maxY, ref count);
+        IncludeTransformHeight(Managers.TitanRig.RightHip, ref minY, ref maxY, ref count);
+        IncludeTransformHeight(Managers.TitanRig.RightKnee, ref minY, ref maxY, ref count);
+        IncludeTransformHeight(Managers.TitanRig.RightFoot, ref minY, ref maxY, ref count);
+
+        if (count <= 0)
+        {
+            return false;
+        }
+
+        float boundsCenterY = (minY + maxY) * 0.5f;
+        float rootMinY = _titanTarget.position.y + Mathf.Max(0f, _minimumPivotHeightAboveRoot);
+        pivotY = Mathf.Max(boundsCenterY, rootMinY);
+        return true;
+    }
+
+    private static void IncludeTransformHeight(Transform value, ref float minY, ref float maxY, ref int count)
+    {
+        if (value == null)
+        {
+            return;
+        }
+
+        float y = value.position.y;
+        minY = Mathf.Min(minY, y);
+        maxY = Mathf.Max(maxY, y);
+        count++;
     }
 }

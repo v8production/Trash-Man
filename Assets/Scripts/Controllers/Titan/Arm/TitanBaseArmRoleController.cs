@@ -18,6 +18,8 @@ public abstract class TitanBaseArmRoleController : TitanBaseController
     [SerializeField] private bool gravitySagEnabled = true;
     [SerializeField] private float gravityTorqueToDegrees = 4f;
     [SerializeField] private float maxGravitySagDegreesPerSecond = 45f;
+    [SerializeField] private float gravityTorqueDeadZoneDegreesPerSecond = 0.05f;
+    [SerializeField] private float minRootUprightForGravitySag = 0.25f;
     [SerializeField] private Vector3 lowerArmCenterOfMassLocalOffset = new(0f, -0.18f, 0f);
     [SerializeField] private float upperArmMass = 1f;
     [SerializeField] private float lowerArmMass = 2f;
@@ -135,6 +137,13 @@ public abstract class TitanBaseArmRoleController : TitanBaseController
         TitanArmControlState state = Managers.TitanRig.GetArmState(left: IsLeftArm);
         Transform shoulder = IsLeftArm ? Managers.TitanRig.LeftShoulder : Managers.TitanRig.RightShoulder;
         Transform elbow = IsLeftArm ? Managers.TitanRig.LeftElbow : Managers.TitanRig.RightElbow;
+        float gravitySagScale = ComputeGravitySagScale(Managers.TitanRig.MovementRoot);
+        if (gravitySagScale <= 0f)
+        {
+            _gravityFullyLimited = false;
+            return;
+        }
+
         bool shoulderPitchLimited = false;
         bool shoulderRollLimited = false;
         bool elbowLimited = false;
@@ -144,9 +153,9 @@ public abstract class TitanBaseArmRoleController : TitanBaseController
             LowerArmCenter(elbow),
             lowerArmMass);
 
-        state.ShoulderPitch = ApplyGravityTorque(state.ShoulderPitch, shoulderPitchLimit, shoulder, shoulder != null ? shoulder.right : Vector3.right, deltaTime, ref shoulderPitchLimited, armCenter);
-        state.ShoulderRoll = ApplyGravityTorque(state.ShoulderRoll, shoulderRollLimit, shoulder, shoulder != null ? shoulder.forward : Vector3.forward, deltaTime, ref shoulderRollLimited, armCenter);
-        state.ElbowPitch = ApplyGravityTorque(state.ElbowPitch, GetResolvedElbowPitchLimit(), elbow, elbow != null ? elbow.up : Vector3.up, deltaTime, ref elbowLimited, WeightedCenter(LowerArmCenter(elbow), lowerArmMass));
+        state.ShoulderPitch = ApplyGravityTorque(state.ShoulderPitch, shoulderPitchLimit, shoulder, shoulder != null ? shoulder.right : Vector3.right, deltaTime, gravitySagScale, ref shoulderPitchLimited, armCenter);
+        state.ShoulderRoll = ApplyGravityTorque(state.ShoulderRoll, shoulderRollLimit, shoulder, shoulder != null ? shoulder.forward : Vector3.forward, deltaTime, gravitySagScale, ref shoulderRollLimited, armCenter);
+        state.ElbowPitch = ApplyGravityTorque(state.ElbowPitch, GetResolvedElbowPitchLimit(), elbow, elbow != null ? elbow.up : Vector3.up, deltaTime, gravitySagScale, ref elbowLimited, WeightedCenter(LowerArmCenter(elbow), lowerArmMass));
         _gravityFullyLimited = shoulderPitchLimited && shoulderRollLimited && elbowLimited;
 
         Managers.TitanRig.SetArmState(left: IsLeftArm, state);
@@ -161,9 +170,9 @@ public abstract class TitanBaseArmRoleController : TitanBaseController
         return new Vector2(-elbowPitchLimit.y, -elbowPitchLimit.x);
     }
 
-    private float ApplyGravityTorque(float current, Vector2 limit, Transform joint, Vector3 worldAxis, float deltaTime, ref bool limitedByGravity, WeightedPoint weightedPoint)
+    private float ApplyGravityTorque(float current, Vector2 limit, Transform joint, Vector3 worldAxis, float deltaTime, float gravitySagScale, ref bool limitedByGravity, WeightedPoint weightedPoint)
     {
-        if (joint == null || weightedPoint.Mass <= 0f || worldAxis.sqrMagnitude < 0.0001f)
+        if (joint == null || weightedPoint.Mass <= 0f || worldAxis.sqrMagnitude < 0.0001f || gravitySagScale <= 0f)
         {
             return Mathf.Clamp(current, limit.x, limit.y);
         }
@@ -171,8 +180,20 @@ public abstract class TitanBaseArmRoleController : TitanBaseController
         Vector3 lever = weightedPoint.Position - joint.position;
         Vector3 gravityForce = Physics.gravity * weightedPoint.Mass;
         float torque = Vector3.Dot(worldAxis.normalized, Vector3.Cross(lever, gravityForce));
+        float degreesPerSecond = torque * gravityTorqueToDegrees * gravitySagScale;
+        if (Mathf.Abs(degreesPerSecond) <= gravityTorqueDeadZoneDegreesPerSecond)
+        {
+            return Mathf.Clamp(current, limit.x, limit.y);
+        }
+
         float maxStep = maxGravitySagDegreesPerSecond * Mathf.Max(0f, deltaTime);
-        float step = Mathf.Clamp(torque * gravityTorqueToDegrees * Mathf.Max(0f, deltaTime), -maxStep, maxStep);
+        float step = Mathf.Clamp(degreesPerSecond * Mathf.Max(0f, deltaTime), -maxStep, maxStep);
+        step = ClampToDownwardCenterOfMassMotion(joint, worldAxis, weightedPoint.Position, step);
+        if (Mathf.Abs(step) <= 0.0001f)
+        {
+            return Mathf.Clamp(current, limit.x, limit.y);
+        }
+
         float unclamped = current + step;
         float clamped = Mathf.Clamp(unclamped, limit.x, limit.y);
 
@@ -182,6 +203,34 @@ public abstract class TitanBaseArmRoleController : TitanBaseController
         }
 
         return clamped;
+    }
+
+    private static float ClampToDownwardCenterOfMassMotion(Transform joint, Vector3 worldAxis, Vector3 centerOfMass, float step)
+    {
+        Vector3 axis = worldAxis.normalized;
+        Vector3 lever = centerOfMass - joint.position;
+        float currentHeight = centerOfMass.y;
+        float nextHeight = (joint.position + (Quaternion.AngleAxis(step, axis) * lever)).y;
+
+        if (nextHeight <= currentHeight + 0.0001f)
+        {
+            return step;
+        }
+
+        float oppositeStep = -step;
+        float oppositeHeight = (joint.position + (Quaternion.AngleAxis(oppositeStep, axis) * lever)).y;
+        return oppositeHeight <= currentHeight + 0.0001f ? oppositeStep : 0f;
+    }
+
+    private float ComputeGravitySagScale(Transform root)
+    {
+        if (root == null)
+        {
+            return 1f;
+        }
+
+        float upright = Mathf.Abs(Vector3.Dot(root.up.normalized, Vector3.up));
+        return Mathf.InverseLerp(Mathf.Clamp01(minRootUprightForGravitySag), 1f, upright);
     }
 
     private Vector3 LowerArmCenter(Transform elbow)

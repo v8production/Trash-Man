@@ -289,54 +289,21 @@ public sealed class TitanLegAnchorResolver : MonoBehaviour
             return;
         }
 
-        bool appliedJointDelta = false;
-        bool shouldRestoreKnee = false;
-
-        if (Mathf.Abs(ankleDelta) > 0.001f)
-        {
-            Vector3 ankleAxis = footBeforeRotation * Vector3.forward;
-            if (ankleAxis.sqrMagnitude > 0.0001f)
-            {
-                Quaternion ankleRotation = Quaternion.AngleAxis(-ankleDelta, ankleAxis.normalized);
-                ApplyRootRotationAroundPivot(movementRoot, footBeforePosition, ankleRotation);
-                appliedJointDelta = true;
-            }
-        }
-
-        if (anchoredKnee != null && Mathf.Abs(kneeDelta) > 0.001f)
-        {
-            Vector3 kneeAxis = kneeBeforeRotation * Vector3.forward;
-            if (kneeAxis.sqrMagnitude > 0.0001f)
-            {
-                Quaternion kneeRotation = Quaternion.AngleAxis(-kneeDelta, kneeAxis.normalized);
-                ApplyRootRotationAroundPivot(movementRoot, kneeBeforePosition, kneeRotation);
-                appliedJointDelta = true;
-                shouldRestoreKnee = true;
-            }
-        }
-
-        if (!appliedJointDelta)
+        if (Mathf.Abs(kneeDelta) <= 0.001f && Mathf.Abs(ankleDelta) <= 0.001f)
         {
             return;
         }
 
-        _pendingKnee = shouldRestoreKnee ? anchoredKnee : null;
+        // In single-foot anchor mode, the attached foot is the actual constraint.
+        // Whether the input came from ankle or knee, solve once by restoring the attached foot world pose.
+        // This makes the body above the controlled joint move instead of fighting the lower anchored chain.
+        ApplyCompensatedRootDelta(anchoredFoot, footBeforePosition, footBeforeRotation);
         _pendingFoot = anchoredFoot;
-        if (shouldRestoreKnee)
-        {
-            _pendingKneePose = new WorldPose(kneeBeforePosition, kneeBeforeRotation);
-        }
         _pendingFootPose = new WorldPose(footBeforePosition, footBeforeRotation);
+        _pendingKnee = null;
         _pendingHip = null;
         _hasPendingAnchoredLegPose = true;
         _skipAnchorStabilizationThisFrame = true;
-    }
-
-    private static void ApplyRootRotationAroundPivot(Transform movementRoot, Vector3 pivot, Quaternion rotation)
-    {
-        Vector3 nextPosition = pivot + (rotation * (movementRoot.position - pivot));
-        Quaternion nextRotation = rotation * movementRoot.rotation;
-        Managers.TitanRig.ApplyMovementRootPose(nextPosition, nextRotation, zeroVelocities: false);
     }
 
     public void StabilizeNow(float deltaTime)
