@@ -33,7 +33,6 @@ public abstract class TitanBaseLegRoleController : TitanBaseController
     [SerializeField] private bool gravitySagEnabled = true;
     [SerializeField] private float gravityTorqueToDegrees = 4f;
     [SerializeField] private float maxGravitySagDegreesPerSecond = 45f;
-    [SerializeField] private float gravityOverflowTorque = 85f;
     [SerializeField] private Vector3 footCenterOfMassLocalOffset = new(0f, 0f, 0.18f);
     [SerializeField] private float footMass = 1f;
     [SerializeField] private float calfMass = 1f;
@@ -53,6 +52,9 @@ public abstract class TitanBaseLegRoleController : TitanBaseController
 
     private float _activationHipYaw;
     private float _activationHipRoll;
+    private bool _gravityFullyLimited;
+
+    public bool IsGravityFullyLimited => _gravityFullyLimited;
 
     protected override void Awake()
     {
@@ -172,6 +174,7 @@ public abstract class TitanBaseLegRoleController : TitanBaseController
     {
         if (!gravitySagEnabled || !Managers.TitanRig.EnsureReady())
         {
+            _gravityFullyLimited = false;
             return;
         }
 
@@ -183,8 +186,9 @@ public abstract class TitanBaseLegRoleController : TitanBaseController
         Transform foot = IsLeftLeg ? Managers.TitanRig.LeftFoot : Managers.TitanRig.RightFoot;
         Transform root = Managers.TitanRig.MovementRoot;
         Transform spine = Managers.TitanRig.Spine;
-        bool overflow = false;
-        float overflowTorque = 0f;
+        bool hipLimited = false;
+        bool kneeLimited = false;
+        bool ankleLimited = false;
 
         state.HipRoll = ApplyGravityTorque(
             state.HipRoll,
@@ -192,8 +196,7 @@ public abstract class TitanBaseLegRoleController : TitanBaseController
             hip,
             hip != null ? hip.forward : Vector3.forward,
             deltaTime,
-            ref overflow,
-            ref overflowTorque,
+            ref hipLimited,
             WeightedCenter(
                 SegmentCenter(hip, knee), thighMass,
                 SegmentCenter(knee, foot), calfMass,
@@ -207,8 +210,7 @@ public abstract class TitanBaseLegRoleController : TitanBaseController
             knee,
             knee != null ? knee.forward : Vector3.forward,
             deltaTime,
-            ref overflow,
-            ref overflowTorque,
+            ref kneeLimited,
             WeightedCenter(
                 SegmentCenter(knee, foot), calfMass,
                 FootCenter(foot), footMass));
@@ -219,19 +221,13 @@ public abstract class TitanBaseLegRoleController : TitanBaseController
             foot,
             foot != null ? foot.forward : Vector3.forward,
             deltaTime,
-            ref overflow,
-            ref overflowTorque,
+            ref ankleLimited,
             WeightedCenter(FootCenter(foot), footMass));
+
+        _gravityFullyLimited = hipLimited && kneeLimited && ankleLimited;
 
         Managers.TitanRig.SetLegState(left: IsLeftLeg, state);
         Managers.TitanRig.ApplyLegPose(left: IsLeftLeg);
-
-        if (overflow && legAnchorResolver != null)
-        {
-            legAnchorResolver.ReleaseAllFeetForGravityOverflow();
-            Vector3 axis = root != null ? root.forward : Vector3.forward;
-            legAnchorResolver.ApplyGravityOverflowTorque(axis, overflowTorque, gravityOverflowTorque);
-        }
     }
 
     private void ResolveDependencies()
@@ -301,8 +297,7 @@ public abstract class TitanBaseLegRoleController : TitanBaseController
         Transform joint,
         Vector3 worldAxis,
         float deltaTime,
-        ref bool overflow,
-        ref float overflowTorque,
+        ref bool limitedByGravity,
         WeightedPoint weightedPoint)
     {
         if (joint == null || weightedPoint.Mass <= 0f || worldAxis.sqrMagnitude < 0.0001f)
@@ -320,8 +315,7 @@ public abstract class TitanBaseLegRoleController : TitanBaseController
 
         if (!Mathf.Approximately(unclamped, clamped))
         {
-            overflow = true;
-            overflowTorque += torque;
+            limitedByGravity = true;
         }
 
         return clamped;

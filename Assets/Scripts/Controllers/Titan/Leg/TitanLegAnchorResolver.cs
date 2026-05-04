@@ -51,6 +51,11 @@ public sealed class TitanLegAnchorResolver : MonoBehaviour
     [SerializeField] private float singleFootYawDeadZoneDegrees = 0.25f;
     [SerializeField] private bool zeroBodyVelocityWhenLocked = true;
 
+    [Header("Gravity Release")]
+    [SerializeField] private float gravityReleaseReattachDelay = 0.75f;
+    [SerializeField] private float gravityLimitFallTorque = 18f;
+    [SerializeField] private float maxGravityReleaseAngularSpeed = 2.5f;
+
     private bool wasLocked;
     private Vector3 lockedRootPosition;
     private Quaternion lockedRootRotation;
@@ -441,8 +446,34 @@ public sealed class TitanLegAnchorResolver : MonoBehaviour
 
     public void ReleaseAllFeetForGravityOverflow()
     {
-        leftFootAttachment?.Detach();
-        rightFootAttachment?.Detach();
+        ReleaseAllFeetForGravity(gravityReleaseReattachDelay);
+    }
+
+    public void ReleaseAllFeetForGravityLimit()
+    {
+        ReleaseAllFeetForGravity(gravityReleaseReattachDelay);
+    }
+
+    public void ApplyGravityLimitFallTorque(float direction)
+    {
+        if (Mathf.Abs(direction) < 0.001f || gravityLimitFallTorque <= 0f)
+        {
+            return;
+        }
+
+        Rigidbody body = Managers.TitanRig.MovementRigidbody;
+        Transform root = Managers.TitanRig.MovementRoot;
+        if (body == null || root == null)
+        {
+            return;
+        }
+
+        if (body.angularVelocity.magnitude >= maxGravityReleaseAngularSpeed)
+        {
+            return;
+        }
+
+        body.AddTorque(root.forward * Mathf.Sign(direction) * gravityLimitFallTorque, ForceMode.Acceleration);
     }
 
     public void ApplyGravityOverflowTorque(Vector3 worldAxis, float direction, float acceleration)
@@ -460,6 +491,16 @@ public sealed class TitanLegAnchorResolver : MonoBehaviour
 
         Vector3 axis = worldAxis.sqrMagnitude > 0.0001f ? worldAxis.normalized : Vector3.forward;
         body.AddTorque(axis * Mathf.Sign(direction) * acceleration, ForceMode.Acceleration);
+    }
+
+    private void ReleaseAllFeetForGravity(float reattachDelay)
+    {
+        leftFootAttachment?.SuppressAttachment(reattachDelay);
+        rightFootAttachment?.SuppressAttachment(reattachDelay);
+        leftFootAttachment?.Detach();
+        rightFootAttachment?.Detach();
+        wasLocked = false;
+        _hasPendingAnchoredLegPose = false;
     }
 
     private void ResolveReferences()

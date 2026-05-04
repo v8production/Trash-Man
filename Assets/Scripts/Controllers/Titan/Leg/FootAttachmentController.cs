@@ -12,11 +12,11 @@ public sealed class FootAttachmentController : MonoBehaviour
     [SerializeField] private Transform bottomProbe;
 
     [Header("Ground Detection")]
-    // Default: allow both Default(0) and Ground(6) so basic Plane objects work out of the box.
-    [SerializeField] private LayerMask attachableGroundLayers = (1 << 0) | (1 << 6);
+    [SerializeField] private LayerMask attachableGroundLayers = 1 << 6;
     [SerializeField] private float probeRadius = 0.08f;
     [SerializeField] private float probeDistance = 0.18f;
     [SerializeField] private float probeStartOffset = 0.05f;
+    [SerializeField] private float maxAttachPlaneAngle = 1f;
     [SerializeField] private bool drawDebugGizmos;
     [SerializeField] private bool logAttachDetachTransitions = true;
 
@@ -26,6 +26,7 @@ public sealed class FootAttachmentController : MonoBehaviour
 
     private bool detachHeld;
     private bool isAttached;
+    private float attachmentSuppressedUntil;
     private Vector3 attachedWorldPosition;
     private Quaternion attachedWorldRotation;
     private Collider attachedCollider;
@@ -56,6 +57,11 @@ public sealed class FootAttachmentController : MonoBehaviour
         {
             Detach();
         }
+    }
+
+    public void SuppressAttachment(float seconds)
+    {
+        attachmentSuppressedUntil = Mathf.Max(attachmentSuppressedUntil, Time.time + Mathf.Max(0f, seconds));
     }
 
     public Vector3 GetCurrentContactPoint()
@@ -100,6 +106,11 @@ public sealed class FootAttachmentController : MonoBehaviour
                 continue;
             }
 
+            if (!IsValidAttachPlane(hits[i]))
+            {
+                continue;
+            }
+
             float d = hits[i].distance;
             if (d < bestDist)
             {
@@ -119,7 +130,7 @@ public sealed class FootAttachmentController : MonoBehaviour
 
     public void RefreshAttachmentState()
     {
-        if (detachHeld)
+        if (detachHeld || Time.time < attachmentSuppressedUntil)
         {
             return;
         }
@@ -160,8 +171,37 @@ public sealed class FootAttachmentController : MonoBehaviour
         }
     }
 
+    private bool IsValidAttachPlane(in RaycastHit hit)
+    {
+        if (hit.collider == null || hit.collider.gameObject.layer != 6)
+        {
+            return false;
+        }
+
+        Transform foot = footTransform != null ? footTransform : BottomProbe;
+        if (foot == null)
+        {
+            return false;
+        }
+
+        Vector3 footSoleNormal = -foot.up;
+        if (footSoleNormal.sqrMagnitude < 0.0001f || hit.normal.sqrMagnitude < 0.0001f)
+        {
+            return false;
+        }
+
+        float alignment = Mathf.Abs(Vector3.Dot(footSoleNormal.normalized, hit.normal.normalized));
+        float minAlignment = Mathf.Cos(Mathf.Clamp(maxAttachPlaneAngle, 0f, 90f) * Mathf.Deg2Rad);
+        return alignment >= minAlignment;
+    }
+
     public void Detach()
     {
+        if (!isAttached && attachedCollider == null)
+        {
+            return;
+        }
+
         if (logAttachDetachTransitions)
         {
             Debug.Log($"{InputDebug.Prefix} {LogPrefix} side={side} DETACH attached={isAttached} collider={attachedCollider?.name ?? "<none>"} storedPos={attachedWorldPosition} storedRot={attachedWorldRotation.eulerAngles}");

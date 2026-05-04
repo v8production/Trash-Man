@@ -57,6 +57,7 @@ public class TitanRoleNetworkDriver : MonoBehaviour
         TickLegRole(true, hasLeftLegInput, in leftLegInput, dt);
         TickLegRole(false, hasRightLegInput, in rightLegInput, dt);
         TickJointGravity(dt);
+        ReleaseAnchorsIfGravityFullyLimited();
 
         PublishAuthoritativePose();
     }
@@ -188,6 +189,35 @@ public class TitanRoleNetworkDriver : MonoBehaviour
         _rightArmController?.TickGravitySag(dt, _legAnchorResolver);
         _leftLegController?.TickGravitySag(dt);
         _rightLegController?.TickGravitySag(dt);
+    }
+
+    private void ReleaseAnchorsIfGravityFullyLimited()
+    {
+        if (_legAnchorResolver == null || !_legAnchorResolver.HasAnyAttachedFoot())
+        {
+            return;
+        }
+
+        bool armsLimited = (_leftArmController == null || _leftArmController.IsGravityFullyLimited) &&
+                           (_rightArmController == null || _rightArmController.IsGravityFullyLimited);
+        bool legsLimited = (_leftLegController == null || _leftLegController.IsGravityFullyLimited) &&
+                           (_rightLegController == null || _rightLegController.IsGravityFullyLimited);
+
+        if (armsLimited && legsLimited)
+        {
+            float fallDirection = 0f;
+            if (_leftLegController != null && _leftLegController.IsGravityFullyLimited)
+            {
+                fallDirection -= 1f;
+            }
+            if (_rightLegController != null && _rightLegController.IsGravityFullyLimited)
+            {
+                fallDirection += 1f;
+            }
+
+            _legAnchorResolver.ReleaseAllFeetForGravityLimit();
+            _legAnchorResolver.ApplyGravityLimitFallTorque(Mathf.Abs(fallDirection) > 0.001f ? fallDirection : 1f);
+        }
     }
 
     private void ResolveControllers()

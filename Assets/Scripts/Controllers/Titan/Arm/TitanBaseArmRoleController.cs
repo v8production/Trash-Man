@@ -18,7 +18,6 @@ public abstract class TitanBaseArmRoleController : TitanBaseController
     [SerializeField] private bool gravitySagEnabled = true;
     [SerializeField] private float gravityTorqueToDegrees = 4f;
     [SerializeField] private float maxGravitySagDegreesPerSecond = 45f;
-    [SerializeField] private float gravityOverflowTorque = 70f;
     [SerializeField] private Vector3 lowerArmCenterOfMassLocalOffset = new(0f, -0.18f, 0f);
     [SerializeField] private float upperArmMass = 1f;
     [SerializeField] private float lowerArmMass = 2f;
@@ -31,6 +30,9 @@ public abstract class TitanBaseArmRoleController : TitanBaseController
     private float _lastRoleInputTime = -999f;
     private Vector2 _capturedMouseOrigin;
     private bool _hasCapturedMouseOrigin;
+    private bool _gravityFullyLimited;
+
+    public bool IsGravityFullyLimited => _gravityFullyLimited;
 
     public override void TickRoleInput(in TitanAggregatedInput input, float deltaTime)
     {
@@ -126,34 +128,29 @@ public abstract class TitanBaseArmRoleController : TitanBaseController
     {
         if (!gravitySagEnabled || !Managers.TitanRig.EnsureReady())
         {
+            _gravityFullyLimited = false;
             return;
         }
 
         TitanArmControlState state = Managers.TitanRig.GetArmState(left: IsLeftArm);
         Transform shoulder = IsLeftArm ? Managers.TitanRig.LeftShoulder : Managers.TitanRig.RightShoulder;
         Transform elbow = IsLeftArm ? Managers.TitanRig.LeftElbow : Managers.TitanRig.RightElbow;
-        bool overflow = false;
-        float overflowTorque = 0f;
+        bool shoulderPitchLimited = false;
+        bool shoulderRollLimited = false;
+        bool elbowLimited = false;
         WeightedPoint armCenter = WeightedCenter(
             SegmentCenter(shoulder, elbow),
             upperArmMass,
             LowerArmCenter(elbow),
             lowerArmMass);
 
-        state.ShoulderPitch = ApplyGravityTorque(state.ShoulderPitch, shoulderPitchLimit, shoulder, shoulder != null ? shoulder.right : Vector3.right, deltaTime, ref overflow, ref overflowTorque, armCenter);
-        state.ShoulderRoll = ApplyGravityTorque(state.ShoulderRoll, shoulderRollLimit, shoulder, shoulder != null ? shoulder.forward : Vector3.forward, deltaTime, ref overflow, ref overflowTorque, armCenter);
-        state.ElbowPitch = ApplyGravityTorque(state.ElbowPitch, GetResolvedElbowPitchLimit(), elbow, elbow != null ? elbow.up : Vector3.up, deltaTime, ref overflow, ref overflowTorque, WeightedCenter(LowerArmCenter(elbow), lowerArmMass));
+        state.ShoulderPitch = ApplyGravityTorque(state.ShoulderPitch, shoulderPitchLimit, shoulder, shoulder != null ? shoulder.right : Vector3.right, deltaTime, ref shoulderPitchLimited, armCenter);
+        state.ShoulderRoll = ApplyGravityTorque(state.ShoulderRoll, shoulderRollLimit, shoulder, shoulder != null ? shoulder.forward : Vector3.forward, deltaTime, ref shoulderRollLimited, armCenter);
+        state.ElbowPitch = ApplyGravityTorque(state.ElbowPitch, GetResolvedElbowPitchLimit(), elbow, elbow != null ? elbow.up : Vector3.up, deltaTime, ref elbowLimited, WeightedCenter(LowerArmCenter(elbow), lowerArmMass));
+        _gravityFullyLimited = shoulderPitchLimited && shoulderRollLimited && elbowLimited;
 
         Managers.TitanRig.SetArmState(left: IsLeftArm, state);
         Managers.TitanRig.ApplyArmPose(left: IsLeftArm);
-
-        if (overflow && legAnchorResolver != null)
-        {
-            legAnchorResolver.ReleaseAllFeetForGravityOverflow();
-            Transform root = Managers.TitanRig.MovementRoot;
-            Vector3 axis = root != null ? root.right : Vector3.right;
-            legAnchorResolver.ApplyGravityOverflowTorque(axis, overflowTorque, gravityOverflowTorque);
-        }
     }
 
     private Vector2 GetResolvedElbowPitchLimit()
@@ -164,7 +161,7 @@ public abstract class TitanBaseArmRoleController : TitanBaseController
         return new Vector2(-elbowPitchLimit.y, -elbowPitchLimit.x);
     }
 
-    private float ApplyGravityTorque(float current, Vector2 limit, Transform joint, Vector3 worldAxis, float deltaTime, ref bool overflow, ref float overflowTorque, WeightedPoint weightedPoint)
+    private float ApplyGravityTorque(float current, Vector2 limit, Transform joint, Vector3 worldAxis, float deltaTime, ref bool limitedByGravity, WeightedPoint weightedPoint)
     {
         if (joint == null || weightedPoint.Mass <= 0f || worldAxis.sqrMagnitude < 0.0001f)
         {
@@ -181,8 +178,7 @@ public abstract class TitanBaseArmRoleController : TitanBaseController
 
         if (!Mathf.Approximately(unclamped, clamped))
         {
-            overflow = true;
-            overflowTorque += torque;
+            limitedByGravity = true;
         }
 
         return clamped;
