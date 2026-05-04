@@ -439,6 +439,29 @@ public sealed class TitanLegAnchorResolver : MonoBehaviour
         return attachment != null && attachment.IsAttached;
     }
 
+    public void ReleaseAllFeetForGravityOverflow()
+    {
+        leftFootAttachment?.Detach();
+        rightFootAttachment?.Detach();
+    }
+
+    public void ApplyGravityOverflowTorque(Vector3 worldAxis, float direction, float acceleration)
+    {
+        if (Mathf.Abs(direction) < 0.001f || acceleration <= 0f)
+        {
+            return;
+        }
+
+        Rigidbody body = Managers.TitanRig.MovementRigidbody;
+        if (body == null)
+        {
+            return;
+        }
+
+        Vector3 axis = worldAxis.sqrMagnitude > 0.0001f ? worldAxis.normalized : Vector3.forward;
+        body.AddTorque(axis * Mathf.Sign(direction) * acceleration, ForceMode.Acceleration);
+    }
+
     private void ResolveReferences()
     {
         if (leftFootAttachment == null || rightFootAttachment == null)

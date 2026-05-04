@@ -13,7 +13,7 @@ public class InputManager
     private CursorLockMode _lastCursorLockMode;
     private float _nextTitanInputLogTime;
     private const float TitanInputLogIntervalSeconds = 0.20f;
-    private const bool UseTitanSingleAxisCorrection = false;
+    private static readonly bool UseTitanSingleAxisCorrection = false;
     private const float TitanSingleAxisDeadZonePixels = 2f;
     private const float TitanHorizontalAssistBiasPixels = 18f;
     private const float TitanMouseSensitivity = 5f;
@@ -95,10 +95,13 @@ public class InputManager
         input.BodyWaist = GetAxis(Key.D, Key.A);
 
         float ws = GetAxis(Key.W, Key.S);
+        bool shiftHeld = IsShiftHeld();
         input.LeftArmElbow = ws;
         input.RightArmElbow = ws;
-        input.LeftLegKnee = ws;
-        input.RightLegKnee = ws;
+        input.LeftLegKnee = shiftHeld ? 0f : ws;
+        input.RightLegKnee = shiftHeld ? 0f : ws;
+        input.LeftLegAnkle = shiftHeld ? ws : 0f;
+        input.RightLegAnkle = shiftHeld ? ws : 0f;
 
         MaybeLogTitanInput(input);
         return input;
@@ -197,6 +200,12 @@ public class InputManager
         return axis;
     }
 
+    private bool IsShiftHeld()
+    {
+        Keyboard keyboard = Keyboard.current;
+        return keyboard != null && (keyboard.leftShiftKey.isPressed || keyboard.rightShiftKey.isPressed);
+    }
+
     public bool WasDigitPressedThisFrame(int digitOneToFive)
     {
         switch (digitOneToFive)
@@ -230,14 +239,15 @@ public class InputManager
             return;
 
         bool hasWs = Mathf.Abs(input.LeftArmElbow) > 0.001f;
+        bool hasAnkle = Mathf.Abs(input.LeftLegAnkle) > 0.001f;
         bool hasWaist = Mathf.Abs(input.BodyWaist) > 0.001f;
         bool hasArrows = Mathf.Abs(input.BodyForward) > 0.001f || Mathf.Abs(input.BodyStrafe) > 0.001f;
         bool hasTurn = Mathf.Abs(input.BodyTurn) > 0.001f;
 
-        if (!hasWs && !hasWaist && !hasArrows && !hasTurn)
+        if (!hasWs && !hasAnkle && !hasWaist && !hasArrows && !hasTurn)
             return;
 
         _nextTitanInputLogTime = Time.unscaledTime + TitanInputLogIntervalSeconds;
-        InputDebug.Log($"Managers.Input arrows(fwd={input.BodyForward}, strafe={input.BodyStrafe}) turn={input.BodyTurn} waist(A/D)={input.BodyWaist} ws(W/S)={input.LeftArmElbow}");
+        InputDebug.Log($"Managers.Input arrows(fwd={input.BodyForward}, strafe={input.BodyStrafe}) turn={input.BodyTurn} waist(A/D)={input.BodyWaist} ws(W/S)={input.LeftArmElbow} ankle(Shift+W/S)={input.LeftLegAnkle}");
     }
 }

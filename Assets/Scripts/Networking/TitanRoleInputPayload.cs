@@ -21,6 +21,8 @@ public struct TitanRoleInputPayload : INetworkSerializable, IEquatable<TitanRole
     public float RightArmElbow;
     public float LeftLegKnee;
     public float RightLegKnee;
+    public float LeftLegAnkle;
+    public float RightLegAnkle;
 
     public TitanRoleInputPayload(in TitanAggregatedInput input)
     {
@@ -39,6 +41,8 @@ public struct TitanRoleInputPayload : INetworkSerializable, IEquatable<TitanRole
         RightArmElbow = input.RightArmElbow;
         LeftLegKnee = input.LeftLegKnee;
         RightLegKnee = input.RightLegKnee;
+        LeftLegAnkle = input.LeftLegAnkle;
+        RightLegAnkle = input.RightLegAnkle;
     }
 
     public TitanAggregatedInput ToAggregatedInput()
@@ -58,6 +62,8 @@ public struct TitanRoleInputPayload : INetworkSerializable, IEquatable<TitanRole
             RightArmElbow = RightArmElbow,
             LeftLegKnee = LeftLegKnee,
             RightLegKnee = RightLegKnee,
+            LeftLegAnkle = LeftLegAnkle,
+            RightLegAnkle = RightLegAnkle,
         };
     }
 
@@ -78,6 +84,8 @@ public struct TitanRoleInputPayload : INetworkSerializable, IEquatable<TitanRole
         serializer.SerializeValue(ref RightArmElbow);
         serializer.SerializeValue(ref LeftLegKnee);
         serializer.SerializeValue(ref RightLegKnee);
+        serializer.SerializeValue(ref LeftLegAnkle);
+        serializer.SerializeValue(ref RightLegAnkle);
     }
 
     public bool Equals(TitanRoleInputPayload other)
@@ -96,7 +104,9 @@ public struct TitanRoleInputPayload : INetworkSerializable, IEquatable<TitanRole
             && LeftArmElbow.Equals(other.LeftArmElbow)
             && RightArmElbow.Equals(other.RightArmElbow)
             && LeftLegKnee.Equals(other.LeftLegKnee)
-            && RightLegKnee.Equals(other.RightLegKnee);
+            && RightLegKnee.Equals(other.RightLegKnee)
+            && LeftLegAnkle.Equals(other.LeftLegAnkle)
+            && RightLegAnkle.Equals(other.RightLegAnkle);
     }
 }
 
@@ -121,11 +131,15 @@ public struct TitanRigPosePayload : INetworkSerializable, IEquatable<TitanRigPos
     public Quaternion LeftHipRotation;
     public bool HasLeftKnee;
     public Quaternion LeftKneeRotation;
+    public bool HasLeftFoot;
+    public Quaternion LeftFootRotation;
 
     public bool HasRightHip;
     public Quaternion RightHipRotation;
     public bool HasRightKnee;
     public Quaternion RightKneeRotation;
+    public bool HasRightFoot;
+    public Quaternion RightFootRotation;
 
     public bool HasSpine;
     public Quaternion SpineRotation;
@@ -151,11 +165,15 @@ public struct TitanRigPosePayload : INetworkSerializable, IEquatable<TitanRigPos
         LeftHipRotation = snapshot.LeftHipRotation;
         HasLeftKnee = snapshot.HasLeftKnee;
         LeftKneeRotation = snapshot.LeftKneeRotation;
+        HasLeftFoot = snapshot.HasLeftFoot;
+        LeftFootRotation = snapshot.LeftFootRotation;
 
         HasRightHip = snapshot.HasRightHip;
         RightHipRotation = snapshot.RightHipRotation;
         HasRightKnee = snapshot.HasRightKnee;
         RightKneeRotation = snapshot.RightKneeRotation;
+        HasRightFoot = snapshot.HasRightFoot;
+        RightFootRotation = snapshot.RightFootRotation;
 
         HasSpine = snapshot.HasSpine;
         SpineRotation = snapshot.SpineRotation;
@@ -182,11 +200,15 @@ public struct TitanRigPosePayload : INetworkSerializable, IEquatable<TitanRigPos
             LeftHipRotation = LeftHipRotation,
             HasLeftKnee = HasLeftKnee,
             LeftKneeRotation = LeftKneeRotation,
+            HasLeftFoot = HasLeftFoot,
+            LeftFootRotation = LeftFootRotation,
 
             HasRightHip = HasRightHip,
             RightHipRotation = RightHipRotation,
             HasRightKnee = HasRightKnee,
             RightKneeRotation = RightKneeRotation,
+            HasRightFoot = HasRightFoot,
+            RightFootRotation = RightFootRotation,
 
             HasSpine = HasSpine,
             SpineRotation = SpineRotation,
@@ -214,11 +236,15 @@ public struct TitanRigPosePayload : INetworkSerializable, IEquatable<TitanRigPos
         serializer.SerializeValue(ref LeftHipRotation);
         serializer.SerializeValue(ref HasLeftKnee);
         serializer.SerializeValue(ref LeftKneeRotation);
+        serializer.SerializeValue(ref HasLeftFoot);
+        serializer.SerializeValue(ref LeftFootRotation);
 
         serializer.SerializeValue(ref HasRightHip);
         serializer.SerializeValue(ref RightHipRotation);
         serializer.SerializeValue(ref HasRightKnee);
         serializer.SerializeValue(ref RightKneeRotation);
+        serializer.SerializeValue(ref HasRightFoot);
+        serializer.SerializeValue(ref RightFootRotation);
 
         serializer.SerializeValue(ref HasSpine);
         serializer.SerializeValue(ref SpineRotation);
@@ -241,10 +267,14 @@ public struct TitanRigPosePayload : INetworkSerializable, IEquatable<TitanRigPos
             && LeftHipRotation.Equals(other.LeftHipRotation)
             && HasLeftKnee == other.HasLeftKnee
             && LeftKneeRotation.Equals(other.LeftKneeRotation)
+            && HasLeftFoot == other.HasLeftFoot
+            && LeftFootRotation.Equals(other.LeftFootRotation)
             && HasRightHip == other.HasRightHip
             && RightHipRotation.Equals(other.RightHipRotation)
             && HasRightKnee == other.HasRightKnee
             && RightKneeRotation.Equals(other.RightKneeRotation)
+            && HasRightFoot == other.HasRightFoot
+            && RightFootRotation.Equals(other.RightFootRotation)
             && HasSpine == other.HasSpine
             && SpineRotation.Equals(other.SpineRotation);
     }

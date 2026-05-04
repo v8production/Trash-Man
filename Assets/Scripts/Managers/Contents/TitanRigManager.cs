@@ -236,11 +236,15 @@ public struct TitanRigPoseSnapshot
     public Quaternion LeftHipRotation;
     public bool HasLeftKnee;
     public Quaternion LeftKneeRotation;
+    public bool HasLeftFoot;
+    public Quaternion LeftFootRotation;
 
     public bool HasRightHip;
     public Quaternion RightHipRotation;
     public bool HasRightKnee;
     public Quaternion RightKneeRotation;
+    public bool HasRightFoot;
+    public Quaternion RightFootRotation;
 
     public bool HasSpine;
     public Quaternion SpineRotation;
@@ -260,4 +264,5 @@ public struct TitanLegControlState
     public float HipYaw;
     public float HipRoll;
     public float KneeRoll;
+    public float AnkleRoll;
 }

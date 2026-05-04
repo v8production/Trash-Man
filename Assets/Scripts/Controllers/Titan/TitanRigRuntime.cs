@@ -36,8 +36,10 @@ public sealed class TitanRigRuntime : MonoBehaviour
     private Quaternion rightElbowBaseRotation;
     private Quaternion leftHipBaseRotation;
     private Quaternion leftKneeBaseRotation;
+    private Quaternion leftFootBaseRotation;
     private Quaternion rightHipBaseRotation;
     private Quaternion rightKneeBaseRotation;
+    private Quaternion rightFootBaseRotation;
     private Quaternion spineBaseRotation;
 
     private bool warnedMissingBones;
@@ -137,7 +139,7 @@ public sealed class TitanRigRuntime : MonoBehaviour
         if (hasAnyDrivenBone && !loggedResolvedBones)
         {
             loggedResolvedBones = true;
-            Debug.Log($"[TitanRigManager] Resolved bones - LS:{NameOrNone(leftShoulder)} LE:{NameOrNone(leftElbow)} RS:{NameOrNone(rightShoulder)} RE:{NameOrNone(rightElbow)} LH:{NameOrNone(leftHip)} LK:{NameOrNone(leftKnee)} RH:{NameOrNone(rightHip)} RK:{NameOrNone(rightKnee)} SP:{NameOrNone(spine)}", this);
+            Debug.Log($"[TitanRigManager] Resolved bones - LS:{NameOrNone(leftShoulder)} LE:{NameOrNone(leftElbow)} RS:{NameOrNone(rightShoulder)} RE:{NameOrNone(rightElbow)} LH:{NameOrNone(leftHip)} LK:{NameOrNone(leftKnee)} LF:{NameOrNone(leftFoot)} RH:{NameOrNone(rightHip)} RK:{NameOrNone(rightKnee)} RF:{NameOrNone(rightFoot)} SP:{NameOrNone(spine)}", this);
         }
 
         return hasAnyDrivenBone;
@@ -217,11 +219,11 @@ public sealed class TitanRigRuntime : MonoBehaviour
         TitanLegControlState state = left ? leftLeg : rightLeg;
         if (left)
         {
-            ApplyLeftLeg(state.HipYaw, state.HipRoll, state.KneeRoll);
+            ApplyLeftLeg(state.HipYaw, state.HipRoll, state.KneeRoll, state.AnkleRoll);
             return;
         }
 
-        ApplyRightLeg(state.HipYaw, state.HipRoll, state.KneeRoll);
+        ApplyRightLeg(state.HipYaw, state.HipRoll, state.KneeRoll, state.AnkleRoll);
     }
 
     public void ApplyLeftArm(float shoulderPitch, float shoulderRoll, float elbowPitch)
@@ -250,7 +252,7 @@ public sealed class TitanRigRuntime : MonoBehaviour
         }
     }
 
-    public void ApplyLeftLeg(float hipYaw, float hipRoll, float kneeRoll)
+    public void ApplyLeftLeg(float hipYaw, float hipRoll, float kneeRoll, float ankleRoll)
     {
         if (leftHip != null)
         {
@@ -261,9 +263,14 @@ public sealed class TitanRigRuntime : MonoBehaviour
         {
             leftKnee.localRotation = leftKneeBaseRotation * Quaternion.Euler(0f, 0f, kneeRoll);
         }
+
+        if (leftFoot != null)
+        {
+            leftFoot.localRotation = leftFootBaseRotation * Quaternion.Euler(0f, 0f, ankleRoll);
+        }
     }
 
-    public void ApplyRightLeg(float hipYaw, float hipRoll, float kneeRoll)
+    public void ApplyRightLeg(float hipYaw, float hipRoll, float kneeRoll, float ankleRoll)
     {
         if (rightHip != null)
         {
@@ -273,6 +280,11 @@ public sealed class TitanRigRuntime : MonoBehaviour
         if (rightKnee != null)
         {
             rightKnee.localRotation = rightKneeBaseRotation * Quaternion.Euler(0f, 0f, kneeRoll);
+        }
+
+        if (rightFoot != null)
+        {
+            rightFoot.localRotation = rightFootBaseRotation * Quaternion.Euler(0f, 0f, ankleRoll);
         }
     }
 
@@ -359,6 +371,12 @@ public sealed class TitanRigRuntime : MonoBehaviour
             snapshot.LeftKneeRotation = leftKnee.localRotation;
         }
 
+        snapshot.HasLeftFoot = leftFoot != null;
+        if (snapshot.HasLeftFoot)
+        {
+            snapshot.LeftFootRotation = leftFoot.localRotation;
+        }
+
         snapshot.HasRightHip = rightHip != null;
         if (snapshot.HasRightHip)
         {
@@ -369,6 +387,12 @@ public sealed class TitanRigRuntime : MonoBehaviour
         if (snapshot.HasRightKnee)
         {
             snapshot.RightKneeRotation = rightKnee.localRotation;
+        }
+
+        snapshot.HasRightFoot = rightFoot != null;
+        if (snapshot.HasRightFoot)
+        {
+            snapshot.RightFootRotation = rightFoot.localRotation;
         }
 
         snapshot.HasSpine = spine != null;
@@ -419,6 +443,11 @@ public sealed class TitanRigRuntime : MonoBehaviour
             leftKnee.localRotation = snapshot.LeftKneeRotation;
         }
 
+        if (snapshot.HasLeftFoot && leftFoot != null)
+        {
+            leftFoot.localRotation = snapshot.LeftFootRotation;
+        }
+
         if (snapshot.HasRightHip && rightHip != null)
         {
             rightHip.localRotation = snapshot.RightHipRotation;
@@ -427,6 +456,11 @@ public sealed class TitanRigRuntime : MonoBehaviour
         if (snapshot.HasRightKnee && rightKnee != null)
         {
             rightKnee.localRotation = snapshot.RightKneeRotation;
+        }
+
+        if (snapshot.HasRightFoot && rightFoot != null)
+        {
+            rightFoot.localRotation = snapshot.RightFootRotation;
         }
 
         if (snapshot.HasSpine && spine != null)
@@ -721,8 +755,10 @@ public sealed class TitanRigRuntime : MonoBehaviour
             rightElbow != null ||
             leftHip != null ||
             leftKnee != null ||
+            leftFoot != null ||
             rightHip != null ||
             rightKnee != null ||
+            rightFoot != null ||
             spine != null;
     }
 
@@ -931,6 +967,11 @@ public sealed class TitanRigRuntime : MonoBehaviour
             leftKneeBaseRotation = leftKnee.localRotation;
         }
 
+        if (leftFoot != null)
+        {
+            leftFootBaseRotation = leftFoot.localRotation;
+        }
+
         if (rightHip != null)
         {
             rightHipBaseRotation = rightHip.localRotation;
@@ -939,6 +980,11 @@ public sealed class TitanRigRuntime : MonoBehaviour
         if (rightKnee != null)
         {
             rightKneeBaseRotation = rightKnee.localRotation;
+        }
+
+        if (rightFoot != null)
+        {
+            rightFootBaseRotation = rightFoot.localRotation;
         }
 
         if (spine != null)

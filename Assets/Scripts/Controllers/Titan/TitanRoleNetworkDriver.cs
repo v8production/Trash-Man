@@ -56,6 +56,7 @@ public class TitanRoleNetworkDriver : MonoBehaviour
         TickArmRole(false, dt);
         TickLegRole(true, hasLeftLegInput, in leftLegInput, dt);
         TickLegRole(false, hasRightLegInput, in rightLegInput, dt);
+        TickJointGravity(dt);
 
         PublishAuthoritativePose();
     }
@@ -179,6 +180,14 @@ public class TitanRoleNetworkDriver : MonoBehaviour
         {
             controller.TickRoleInput(input, dt);
         }
+    }
+
+    private void TickJointGravity(float dt)
+    {
+        _leftArmController?.TickGravitySag(dt, _legAnchorResolver);
+        _rightArmController?.TickGravitySag(dt, _legAnchorResolver);
+        _leftLegController?.TickGravitySag(dt);
+        _rightLegController?.TickGravitySag(dt);
     }
 
     private void ResolveControllers()
