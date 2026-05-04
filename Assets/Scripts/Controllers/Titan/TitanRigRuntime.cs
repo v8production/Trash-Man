@@ -65,6 +65,10 @@ public sealed class TitanRigRuntime : MonoBehaviour
     }
 
     public Transform MovementRoot => mechaRoot != null ? mechaRoot : transform;
+    public Transform LeftShoulder => leftShoulder;
+    public Transform LeftElbow => leftElbow;
+    public Transform RightShoulder => rightShoulder;
+    public Transform RightElbow => rightElbow;
     public Transform LeftHip => leftHip;
     public Transform LeftKnee => leftKnee;
     public Transform LeftFoot => leftFoot;

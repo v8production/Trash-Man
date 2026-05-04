@@ -31,8 +31,10 @@ public abstract class TitanBaseLegRoleController : TitanBaseController
 
     [Header("Gravity Sag")]
     [SerializeField] private bool gravitySagEnabled = true;
-    [SerializeField] private float gravitySagSpeed = 12f;
+    [SerializeField] private float gravityTorqueToDegrees = 4f;
+    [SerializeField] private float maxGravitySagDegreesPerSecond = 45f;
     [SerializeField] private float gravityOverflowTorque = 85f;
+    [SerializeField] private Vector3 footCenterOfMassLocalOffset = new(0f, 0f, 0.18f);
     [SerializeField] private float footMass = 1f;
     [SerializeField] private float calfMass = 1f;
     [SerializeField] private float thighMass = 1f;
@@ -176,16 +178,50 @@ public abstract class TitanBaseLegRoleController : TitanBaseController
         ResolveDependencies();
 
         TitanLegControlState state = Managers.TitanRig.GetLegState(left: IsLeftLeg);
-        float sideSign = IsLeftLeg ? -1f : 1f;
-        float hipMass = thighMass + calfMass + footMass + pelvisMass + bodyMass;
-        float hipDirection = sideSign * Mathf.Sign(hipMass);
-        float kneeDirection = sideSign * Mathf.Sign(calfMass + footMass);
-        float ankleDirection = sideSign * Mathf.Sign(footMass);
+        Transform hip = IsLeftLeg ? Managers.TitanRig.LeftHip : Managers.TitanRig.RightHip;
+        Transform knee = IsLeftLeg ? Managers.TitanRig.LeftKnee : Managers.TitanRig.RightKnee;
+        Transform foot = IsLeftLeg ? Managers.TitanRig.LeftFoot : Managers.TitanRig.RightFoot;
+        Transform root = Managers.TitanRig.MovementRoot;
+        Transform spine = Managers.TitanRig.Spine;
         bool overflow = false;
+        float overflowTorque = 0f;
 
-        state.HipRoll = ApplySag(state.HipRoll, hipRollLimit, hipDirection, hipMass, deltaTime, ref overflow);
-        state.KneeRoll = ApplySag(state.KneeRoll, kneeRollLimit, kneeDirection, calfMass + footMass, deltaTime, ref overflow);
-        state.AnkleRoll = ApplySag(state.AnkleRoll, ankleRollLimit, ankleDirection, footMass, deltaTime, ref overflow);
+        state.HipRoll = ApplyGravityTorque(
+            state.HipRoll,
+            hipRollLimit,
+            hip,
+            hip != null ? hip.forward : Vector3.forward,
+            deltaTime,
+            ref overflow,
+            ref overflowTorque,
+            WeightedCenter(
+                SegmentCenter(hip, knee), thighMass,
+                SegmentCenter(knee, foot), calfMass,
+                FootCenter(foot), footMass,
+                root != null ? root.position : Vector3.zero, pelvisMass,
+                spine != null ? spine.position : root != null ? root.position + Vector3.up : Vector3.up, bodyMass));
+
+        state.KneeRoll = ApplyGravityTorque(
+            state.KneeRoll,
+            kneeRollLimit,
+            knee,
+            knee != null ? knee.forward : Vector3.forward,
+            deltaTime,
+            ref overflow,
+            ref overflowTorque,
+            WeightedCenter(
+                SegmentCenter(knee, foot), calfMass,
+                FootCenter(foot), footMass));
+
+        state.AnkleRoll = ApplyGravityTorque(
+            state.AnkleRoll,
+            ankleRollLimit,
+            foot,
+            foot != null ? foot.forward : Vector3.forward,
+            deltaTime,
+            ref overflow,
+            ref overflowTorque,
+            WeightedCenter(FootCenter(foot), footMass));
 
         Managers.TitanRig.SetLegState(left: IsLeftLeg, state);
         Managers.TitanRig.ApplyLegPose(left: IsLeftLeg);
@@ -193,9 +229,8 @@ public abstract class TitanBaseLegRoleController : TitanBaseController
         if (overflow && legAnchorResolver != null)
         {
             legAnchorResolver.ReleaseAllFeetForGravityOverflow();
-            Transform root = Managers.TitanRig.MovementRoot;
             Vector3 axis = root != null ? root.forward : Vector3.forward;
-            legAnchorResolver.ApplyGravityOverflowTorque(axis, sideSign, gravityOverflowTorque);
+            legAnchorResolver.ApplyGravityOverflowTorque(axis, overflowTorque, gravityOverflowTorque);
         }
     }
 
@@ -260,23 +295,100 @@ public abstract class TitanBaseLegRoleController : TitanBaseController
         );
     }
 
-    private float ApplySag(float current, Vector2 limit, float direction, float mass, float deltaTime, ref bool overflow)
+    private float ApplyGravityTorque(
+        float current,
+        Vector2 limit,
+        Transform joint,
+        Vector3 worldAxis,
+        float deltaTime,
+        ref bool overflow,
+        ref float overflowTorque,
+        WeightedPoint weightedPoint)
     {
-        if (mass <= 0f || Mathf.Abs(direction) < 0.001f)
+        if (joint == null || weightedPoint.Mass <= 0f || worldAxis.sqrMagnitude < 0.0001f)
         {
             return Mathf.Clamp(current, limit.x, limit.y);
         }
 
-        float step = Mathf.Sign(direction) * gravitySagSpeed * mass * Mathf.Max(0f, deltaTime);
+        Vector3 lever = weightedPoint.Position - joint.position;
+        Vector3 gravityForce = Physics.gravity * weightedPoint.Mass;
+        float torque = Vector3.Dot(worldAxis.normalized, Vector3.Cross(lever, gravityForce));
+        float maxStep = maxGravitySagDegreesPerSecond * Mathf.Max(0f, deltaTime);
+        float step = Mathf.Clamp(torque * gravityTorqueToDegrees * Mathf.Max(0f, deltaTime), -maxStep, maxStep);
         float unclamped = current + step;
         float clamped = Mathf.Clamp(unclamped, limit.x, limit.y);
 
         if (!Mathf.Approximately(unclamped, clamped))
         {
             overflow = true;
+            overflowTorque += torque;
         }
 
         return clamped;
+    }
+
+    private Vector3 FootCenter(Transform foot)
+    {
+        if (foot == null)
+        {
+            return Vector3.zero;
+        }
+
+        return foot.TransformPoint(footCenterOfMassLocalOffset);
+    }
+
+    private static Vector3 SegmentCenter(Transform start, Transform end)
+    {
+        if (start != null && end != null)
+        {
+            return (start.position + end.position) * 0.5f;
+        }
+
+        if (start != null)
+        {
+            return start.position;
+        }
+
+        return end != null ? end.position : Vector3.zero;
+    }
+
+    private static WeightedPoint WeightedCenter(Vector3 a, float massA)
+    {
+        return new WeightedPoint(a, Mathf.Max(0f, massA));
+    }
+
+    private static WeightedPoint WeightedCenter(Vector3 a, float massA, Vector3 b, float massB)
+    {
+        return WeightedCenter(a, massA, b, massB, Vector3.zero, 0f, Vector3.zero, 0f, Vector3.zero, 0f);
+    }
+
+    private static WeightedPoint WeightedCenter(Vector3 a, float massA, Vector3 b, float massB, Vector3 c, float massC, Vector3 d, float massD, Vector3 e, float massE)
+    {
+        massA = Mathf.Max(0f, massA);
+        massB = Mathf.Max(0f, massB);
+        massC = Mathf.Max(0f, massC);
+        massD = Mathf.Max(0f, massD);
+        massE = Mathf.Max(0f, massE);
+        float mass = massA + massB + massC + massD + massE;
+        if (mass <= 0f)
+        {
+            return default;
+        }
+
+        Vector3 position = ((a * massA) + (b * massB) + (c * massC) + (d * massD) + (e * massE)) / mass;
+        return new WeightedPoint(position, mass);
+    }
+}
+
+public readonly struct WeightedPoint
+{
+    public readonly Vector3 Position;
+    public readonly float Mass;
+
+    public WeightedPoint(Vector3 position, float mass)
+    {
+        Position = position;
+        Mass = mass;
     }
 }
 
