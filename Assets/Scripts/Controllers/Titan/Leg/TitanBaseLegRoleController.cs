@@ -77,32 +77,17 @@ public abstract class TitanBaseLegRoleController : TitanBaseController
             Managers.Input.GetTitanMouseSensitivity()
         );
 
-        legAnchorResolver?.UpdateDetachState(command.Side, command.DetachHeld);
+        legAnchorResolver?.UpdateAttachState(command.Side, command.AttachHeld);
 
         if (legAnchorResolver != null &&
             legAnchorResolver.TryApplyAnchoredMovement(command.Side, command, state, deltaTime))
         {
-            if (legAnchorResolver.AreBothFeetAttached())
-            {
-                return;
-            }
-
             if (roleActivated)
             {
                 return;
             }
 
-            float sensitivity = Managers.Input.GetTitanMouseSensitivity();
-
-            float yawDelta = command.MouseDelta.x * 0.12f * sensitivity;
-            float rollDelta = -command.MouseDelta.y * 0.12f * sensitivity;
-
-            legAnchorResolver.ApplyInverseRootFromHipDelta(
-                command.Side,
-                yawDelta,
-                rollDelta
-            );
-
+            legAnchorResolver.ApplyAnchoredLegCommand(command.Side, command, deltaTime);
             return;
         }
 
@@ -127,6 +112,15 @@ public abstract class TitanBaseLegRoleController : TitanBaseController
 
         Managers.TitanRig.SetLegState(left: IsLeftLeg, state);
         Managers.TitanRig.ApplyLegPose(left: IsLeftLeg);
+    }
+
+    public void TickAttachInput(in TitanAggregatedInput input)
+    {
+        ResolveDependencies();
+        legAnchorResolver?.UpdateAttachState(
+            IsLeftLeg ? LegSide.Left : LegSide.Right,
+            input.RightMouseHeld || input.RightMouseAttachBuffered
+        );
     }
 
     public void TickIdle(float deltaTime)
@@ -194,6 +188,8 @@ public abstract class TitanBaseLegRoleController : TitanBaseController
         targetRoll = Mathf.Clamp(targetRoll, hipRollLimit.x, hipRollLimit.y);
         float kneeInput = IsLeftLeg ? -input.LeftLegKnee : -input.RightLegKnee;
         float ankleInput = IsLeftLeg ? -input.LeftLegAnkle : -input.RightLegAnkle;
+        float yawDelta = input.MouseDelta.x * 0.12f * sensitivity;
+        float rollDelta = -input.MouseDelta.y * 0.12f * sensitivity;
 
         return new TitanLegInputCommand
         {
@@ -204,7 +200,11 @@ public abstract class TitanBaseLegRoleController : TitanBaseController
             TargetHipRoll = targetRoll,
             KneeInput = kneeInput,
             AnkleInput = ankleInput,
-            DetachHeld = input.RightMouseDetachBuffered || input.RightMouseHeld || input.RightMousePressedThisFrame,
+            KneeSpeed = kneeSpeed,
+            AnkleSpeed = ankleSpeed,
+            HipYawDelta = yawDelta,
+            HipRollDelta = rollDelta,
+            AttachHeld = input.RightMouseHeld || input.RightMouseAttachBuffered,
         };
     }
 }
@@ -219,5 +219,9 @@ public struct TitanLegInputCommand
     public float TargetHipRoll;
     public float KneeInput;
     public float AnkleInput;
-    public bool DetachHeld;
+    public float KneeSpeed;
+    public float AnkleSpeed;
+    public float HipYawDelta;
+    public float HipRollDelta;
+    public bool AttachHeld;
 }

@@ -820,9 +820,10 @@ MonoBehaviour:
   attachableGroundLayers:
     serializedVersion: 2
     m_Bits: 64
-  probeRadius: 0.08
-  probeDistance: 0.18
+  probeRadius: 0.18
+  probeDistance: 0.8
   probeStartOffset: 0.05
+  parallelToleranceDegrees: 75
   drawDebugGizmos: 0
   logAttachDetachTransitions: 1
   characterRoot: {fileID: 0}
@@ -844,9 +845,10 @@ MonoBehaviour:
   attachableGroundLayers:
     serializedVersion: 2
     m_Bits: 64
-  probeRadius: 0.08
-  probeDistance: 0.18
+  probeRadius: 0.18
+  probeDistance: 0.8
   probeStartOffset: 0.05
+  parallelToleranceDegrees: 75
   drawDebugGizmos: 0
   logAttachDetachTransitions: 1
   characterRoot: {fileID: 0}

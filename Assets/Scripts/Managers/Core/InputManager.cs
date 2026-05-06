@@ -103,7 +103,7 @@ public class InputManager
         input.LeftLegAnkle = shiftHeld ? ws : 0f;
         input.RightLegAnkle = shiftHeld ? ws : 0f;
 
-        MaybeLogTitanInput(input);
+        // MaybeLogTitanInput(input);
         return input;
     }
 

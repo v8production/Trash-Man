@@ -12,11 +12,11 @@ public sealed class FootAttachmentController : MonoBehaviour
     [SerializeField] private Transform bottomProbe;
 
     [Header("Ground Detection")]
-    // Default: allow both Default(0) and Ground(6) so basic Plane objects work out of the box.
-    [SerializeField] private LayerMask attachableGroundLayers = (1 << 0) | (1 << 6);
-    [SerializeField] private float probeRadius = 0.08f;
-    [SerializeField] private float probeDistance = 0.18f;
+    [SerializeField] private LayerMask attachableGroundLayers = 1 << 6;
+    [SerializeField] private float probeRadius = 0.18f;
+    [SerializeField] private float probeDistance = 0.8f;
     [SerializeField] private float probeStartOffset = 0.05f;
+    [SerializeField] private float parallelToleranceDegrees = 75f;
     [SerializeField] private bool drawDebugGizmos;
     [SerializeField] private bool logAttachDetachTransitions = true;
 
@@ -24,7 +24,7 @@ public sealed class FootAttachmentController : MonoBehaviour
     [Tooltip("Colliders under this root are ignored for ground hits (prevents self-hit when using Default layer).")]
     [SerializeField] private Transform characterRoot;
 
-    private bool detachHeld;
+    private bool attachHeld;
     private bool isAttached;
     private Vector3 attachedWorldPosition;
     private Quaternion attachedWorldRotation;
@@ -32,7 +32,7 @@ public sealed class FootAttachmentController : MonoBehaviour
 
     public TitanBaseLegRoleController.LegSide Side => side;
     public bool IsAttached => isAttached;
-    public bool DetachHeld => detachHeld;
+    public bool AttachHeld => attachHeld;
     public Vector3 AttachedWorldPosition => attachedWorldPosition;
     public Quaternion AttachedWorldRotation => attachedWorldRotation;
     public Collider AttachedCollider => attachedCollider;
@@ -44,15 +44,15 @@ public sealed class FootAttachmentController : MonoBehaviour
         RefreshAttachmentState();
     }
 
-    public void SetDetachHeld(bool held)
+    public void SetAttachHeld(bool held)
     {
-        if (detachHeld == held)
+        if (attachHeld == held)
         {
             return;
         }
 
-        detachHeld = held;
-        if (detachHeld)
+        attachHeld = held;
+        if (!attachHeld)
         {
             Detach();
         }
@@ -78,6 +78,19 @@ public sealed class FootAttachmentController : MonoBehaviour
 
         // Use SphereCastAll so we can skip self-colliders reliably.
         RaycastHit[] hits = Physics.SphereCastAll(origin, probeRadius, Vector3.down, castDistance, attachableGroundLayers, QueryTriggerInteraction.Ignore);
+        if (TrySelectBestGroundHit(hits, out hit))
+        {
+            return true;
+        }
+
+        Vector3 fallbackOrigin = probe.position + (Vector3.up * 1.5f);
+        RaycastHit[] fallbackHits = Physics.RaycastAll(fallbackOrigin, Vector3.down, 3f, attachableGroundLayers, QueryTriggerInteraction.Ignore);
+        return TrySelectBestGroundHit(fallbackHits, out hit);
+    }
+
+    private bool TrySelectBestGroundHit(RaycastHit[] hits, out RaycastHit hit)
+    {
+        hit = default;
         if (hits == null || hits.Length == 0)
         {
             return false;
@@ -119,7 +132,7 @@ public sealed class FootAttachmentController : MonoBehaviour
 
     public void RefreshAttachmentState()
     {
-        if (detachHeld)
+        if (!attachHeld)
         {
             return;
         }
@@ -129,7 +142,7 @@ public sealed class FootAttachmentController : MonoBehaviour
             return;
         }
 
-        if (!TryGetGroundHit(out RaycastHit hit))
+        if (!TryGetGroundHit(out RaycastHit hit) || !IsFootParallelToSurface(hit.normal))
         {
             return;
         }
@@ -146,7 +159,7 @@ public sealed class FootAttachmentController : MonoBehaviour
             return;
         }
 
-        attachedWorldPosition = hit.point;
+        attachedWorldPosition = GetCurrentContactPoint();
         attachedWorldRotation = foot.rotation;
         attachedCollider = hit.collider;
         isAttached = true;
@@ -156,7 +169,7 @@ public sealed class FootAttachmentController : MonoBehaviour
         string layerLabel = string.IsNullOrWhiteSpace(layerName) ? layer.ToString() : $"{layerName}({layer})";
         if (logAttachDetachTransitions)
         {
-            Debug.Log($"{InputDebug.Prefix} {LogPrefix} side={side} ATTACH layer={layerLabel} collider={hit.collider.name} point={hit.point} normal={hit.normal} storedPos={attachedWorldPosition} storedRot={attachedWorldRotation.eulerAngles}");
+            Debug.Log($"{InputDebug.Prefix} {LogPrefix} ATTACH SUCCESS side={side} layer={layerLabel} collider={hit.collider.name} point={hit.point} normal={hit.normal} storedPos={attachedWorldPosition} storedRot={attachedWorldRotation.eulerAngles}");
         }
     }
 
@@ -196,5 +209,24 @@ public sealed class FootAttachmentController : MonoBehaviour
             Gizmos.color = Color.cyan;
             Gizmos.DrawWireSphere(attachedWorldPosition, probeRadius);
         }
+    }
+
+    private bool IsFootParallelToSurface(Vector3 surfaceNormal)
+    {
+        Transform foot = footTransform;
+        if (foot == null || surfaceNormal.sqrMagnitude < 0.0001f)
+        {
+            return false;
+        }
+
+        Vector3 normal = surfaceNormal.normalized;
+        float bestAngle = 180f;
+        bestAngle = Mathf.Min(bestAngle, Vector3.Angle(foot.up, normal));
+        bestAngle = Mathf.Min(bestAngle, Vector3.Angle(-foot.up, normal));
+        bestAngle = Mathf.Min(bestAngle, Vector3.Angle(foot.forward, normal));
+        bestAngle = Mathf.Min(bestAngle, Vector3.Angle(-foot.forward, normal));
+        bestAngle = Mathf.Min(bestAngle, Vector3.Angle(foot.right, normal));
+        bestAngle = Mathf.Min(bestAngle, Vector3.Angle(-foot.right, normal));
+        return bestAngle <= parallelToleranceDegrees;
     }
 }

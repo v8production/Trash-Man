@@ -40,8 +40,8 @@ public class LobbyNetworkPlayer : NetworkBehaviour
 
     private float _nextPublishLogTime;
     private const float PublishLogIntervalSeconds = 0.50f;
-    private const float DetachInputBufferSeconds = 0.20f;
-    private float _detachInputBufferRemaining;
+    private const float AttachInputBufferSeconds = 0.20f;
+    private float _attachInputBufferRemaining;
 
     private void Awake()
     {
@@ -237,14 +237,6 @@ public class LobbyNetworkPlayer : NetworkBehaviour
     [Rpc(SendTo.Server, InvokePermission = RpcInvokePermission.Owner)]
     private void SubmitRoleInputServerRpc(TitanRoleInputPayload inputPayload)
     {
-        TitanAggregatedInput snapshot = inputPayload.ToAggregatedInput();
-        bool hasInput = Mathf.Abs(snapshot.TorsoWaist) > 0.001f
-            || Mathf.Abs(snapshot.LeftArmElbow) > 0.001f
-            || Mathf.Abs(snapshot.TorsoForward) > 0.001f
-            || Mathf.Abs(snapshot.TorsoStrafe) > 0.001f
-            || Mathf.Abs(snapshot.TorsoTurn) > 0.001f;
-        if (hasInput)
-            InputDebug.Log($"[ServerRpc] SubmitRoleInputServerRpc from client={OwnerClientId} waist={snapshot.TorsoWaist} ws={snapshot.LeftArmElbow} fwd={snapshot.TorsoForward} strafe={snapshot.TorsoStrafe}");
         _roleInput.Value = inputPayload;
     }
 
@@ -388,15 +380,15 @@ public class LobbyNetworkPlayer : NetworkBehaviour
         if (currentInput.RightMousePressedThisFrame)
         {
             string activeRoleLabel = activeRole != 0 ? ((Define.TitanRole)activeRole).ToString() : "<none>";
-            InputDebug.Log($"[TitanDetachClick] owner={OwnerClientId} selectedMask=0x{selectedMask:X} activeRole={activeRoleLabel} rmbHeld={currentInput.RightMouseHeld} mouse={currentInput.MousePosition} delta={currentInput.MouseDelta}");
-            _detachInputBufferRemaining = DetachInputBufferSeconds;
+            InputDebug.Log($"[TitanAttachClick] owner={OwnerClientId} selectedMask=0x{selectedMask:X} activeRole={activeRoleLabel} rmbHeld={currentInput.RightMouseHeld} mouse={currentInput.MousePosition} delta={currentInput.MouseDelta}");
+            _attachInputBufferRemaining = AttachInputBufferSeconds;
         }
         else
         {
-            _detachInputBufferRemaining = Mathf.Max(0f, _detachInputBufferRemaining - Time.unscaledDeltaTime);
+            _attachInputBufferRemaining = Mathf.Max(0f, _attachInputBufferRemaining - Time.unscaledDeltaTime);
         }
 
-        currentInput.RightMouseDetachBuffered = currentInput.RightMouseHeld || _detachInputBufferRemaining > 0f;
+        currentInput.RightMouseAttachBuffered = currentInput.RightMouseHeld || _attachInputBufferRemaining > 0f;
         TitanRoleInputPayload payload = new(currentInput);
         if (_roleInput.Value.Equals(payload))
             return;
@@ -568,7 +560,7 @@ public class LobbyNetworkPlayer : NetworkBehaviour
             return;
         }
 
-        _detachInputBufferRemaining = 0f;
+        _attachInputBufferRemaining = 0f;
         Managers.Input.ResetTitanMouseBaseline();
     }
 

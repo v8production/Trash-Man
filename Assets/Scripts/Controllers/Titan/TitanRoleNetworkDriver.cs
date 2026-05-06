@@ -48,8 +48,8 @@ public class TitanRoleNetworkDriver : MonoBehaviour
         bool hasLeftLegInput = TryGetLegRoleInput(true, out leftLegInput);
         bool hasRightLegInput = TryGetLegRoleInput(false, out rightLegInput);
 
-        ApplyLegDetachPrepass(true, hasLeftLegInput, in leftLegInput, dt);
-        ApplyLegDetachPrepass(false, hasRightLegInput, in rightLegInput, dt);
+        ApplyLegAttachInput(true, in leftLegInput, hasLeftLegInput);
+        ApplyLegAttachInput(false, in rightLegInput, hasRightLegInput);
 
         TickTorsoRole(dt);
         TickArmRole(true, dt);
@@ -151,18 +151,28 @@ public class TitanRoleNetworkDriver : MonoBehaviour
         return Managers.TitanRole.TryGetRoleInput(role, out input);
     }
 
-    private void ApplyLegDetachPrepass(bool left, bool hasInput, in TitanAggregatedInput input, float dt)
+    private void ApplyLegAttachInput(bool left, in TitanAggregatedInput activeInput, bool hasActiveInput)
     {
-        bool detachRequested = hasInput && (input.RightMouseDetachBuffered || input.RightMouseHeld || input.RightMousePressedThisFrame);
-
         TitanBaseLegRoleController controller = left ? _leftLegController : _rightLegController;
-
-        if (!detachRequested || controller == null)
+        if (controller == null)
         {
             return;
         }
 
-        controller.TickRoleInput(input, dt);
+        if (hasActiveInput)
+        {
+            controller.TickAttachInput(activeInput);
+            return;
+        }
+
+        Define.TitanRole role = left ? Define.TitanRole.LeftLeg : Define.TitanRole.RightLeg;
+        if (Managers.TitanRole.TryGetSelectedRoleInput(role, out TitanAggregatedInput selectedInput))
+        {
+            controller.TickAttachInput(selectedInput);
+            return;
+        }
+
+        controller.TickAttachInput(default);
     }
 
     private void TickLegRole(bool left, bool hasInput, in TitanAggregatedInput input, float dt)
@@ -173,9 +183,7 @@ public class TitanRoleNetworkDriver : MonoBehaviour
             return;
         }
 
-        bool detachRequested = hasInput && (input.RightMouseDetachBuffered || input.RightMouseHeld || input.RightMousePressedThisFrame);
-
-        if (hasInput && !detachRequested)
+        if (hasInput)
         {
             controller.TickRoleInput(input, dt);
         }

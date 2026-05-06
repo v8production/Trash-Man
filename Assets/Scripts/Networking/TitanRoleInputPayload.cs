@@ -10,7 +10,7 @@ public struct TitanRoleInputPayload : INetworkSerializable, IEquatable<TitanRole
     public float MouseDeltaY;
     public bool RightMouseHeld;
     public bool RightMousePressedThisFrame;
-    public bool RightMouseDetachBuffered;
+    public bool RightMouseAttachBuffered;
 
     public float TorsoForward;
     public float TorsoStrafe;
@@ -32,7 +32,7 @@ public struct TitanRoleInputPayload : INetworkSerializable, IEquatable<TitanRole
         MouseDeltaY = input.MouseDelta.y;
         RightMouseHeld = input.RightMouseHeld;
         RightMousePressedThisFrame = input.RightMousePressedThisFrame;
-        RightMouseDetachBuffered = input.RightMouseDetachBuffered;
+        RightMouseAttachBuffered = input.RightMouseAttachBuffered;
         TorsoForward = input.TorsoForward;
         TorsoStrafe = input.TorsoStrafe;
         TorsoTurn = input.TorsoTurn;
@@ -53,7 +53,7 @@ public struct TitanRoleInputPayload : INetworkSerializable, IEquatable<TitanRole
             MouseDelta = new Vector2(MouseDeltaX, MouseDeltaY),
             RightMouseHeld = RightMouseHeld,
             RightMousePressedThisFrame = RightMousePressedThisFrame,
-            RightMouseDetachBuffered = RightMouseDetachBuffered,
+            RightMouseAttachBuffered = RightMouseAttachBuffered,
             TorsoForward = TorsoForward,
             TorsoStrafe = TorsoStrafe,
             TorsoTurn = TorsoTurn,
@@ -75,7 +75,7 @@ public struct TitanRoleInputPayload : INetworkSerializable, IEquatable<TitanRole
         serializer.SerializeValue(ref MouseDeltaY);
         serializer.SerializeValue(ref RightMouseHeld);
         serializer.SerializeValue(ref RightMousePressedThisFrame);
-        serializer.SerializeValue(ref RightMouseDetachBuffered);
+        serializer.SerializeValue(ref RightMouseAttachBuffered);
         serializer.SerializeValue(ref TorsoForward);
         serializer.SerializeValue(ref TorsoStrafe);
         serializer.SerializeValue(ref TorsoTurn);
@@ -96,7 +96,7 @@ public struct TitanRoleInputPayload : INetworkSerializable, IEquatable<TitanRole
             && MouseDeltaY.Equals(other.MouseDeltaY)
             && RightMouseHeld == other.RightMouseHeld
             && RightMousePressedThisFrame == other.RightMousePressedThisFrame
-            && RightMouseDetachBuffered == other.RightMouseDetachBuffered
+            && RightMouseAttachBuffered == other.RightMouseAttachBuffered
             && TorsoForward.Equals(other.TorsoForward)
             && TorsoStrafe.Equals(other.TorsoStrafe)
             && TorsoTurn.Equals(other.TorsoTurn)

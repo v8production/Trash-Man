@@ -149,4 +149,21 @@ public class TitanRoleManager
         input = player.CurrentRoleInput.ToAggregatedInput();
         return true;
     }
+
+    public bool TryGetSelectedRoleInput(Define.TitanRole role, out TitanAggregatedInput input)
+    {
+        input = default;
+        if (!RefreshRoleMap(false, out string error))
+        {
+            return false;
+        }
+
+        if (!_playersByRole.TryGetValue(role, out LobbyNetworkPlayer player) || player == null)
+        {
+            return false;
+        }
+
+        input = player.CurrentRoleInput.ToAggregatedInput();
+        return true;
+    }
 }
