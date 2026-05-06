@@ -25,6 +25,10 @@ public abstract class TitanBaseLegRoleController : TitanBaseController
     [SerializeField] private float kneeSpeed = 110f;
     [SerializeField] private Vector2 kneeRollLimit = new(-5f, 125f);
 
+    [Header("Ankle Input")]
+    [SerializeField] private float ankleSpeed = 110f;
+    [SerializeField] private Vector2 ankleRollLimit = new(-80f, 80f);
+
     [Header("Idle Return")]
     [SerializeField] private float idleReturnSpeed = 12f;
 
@@ -115,6 +119,12 @@ public abstract class TitanBaseLegRoleController : TitanBaseController
             kneeRollLimit.y
         );
 
+        state.AnkleRoll = Mathf.Clamp(
+            state.AnkleRoll + (command.AnkleInput * ankleSpeed * deltaTime),
+            ankleRollLimit.x,
+            ankleRollLimit.y
+        );
+
         Managers.TitanRig.SetLegState(left: IsLeftLeg, state);
         Managers.TitanRig.ApplyLegPose(left: IsLeftLeg);
     }
@@ -141,10 +151,12 @@ public abstract class TitanBaseLegRoleController : TitanBaseController
         state.HipYaw = Mathf.Lerp(state.HipYaw, 0f, blend);
         state.HipRoll = Mathf.Lerp(state.HipRoll, 0f, blend);
         state.KneeRoll = Mathf.Lerp(state.KneeRoll, 0f, blend);
+        state.AnkleRoll = Mathf.Lerp(state.AnkleRoll, 0f, blend);
 
         state.HipYaw = Mathf.Clamp(state.HipYaw, hipYawLimit.x, hipYawLimit.y);
         state.HipRoll = Mathf.Clamp(state.HipRoll, hipRollLimit.x, hipRollLimit.y);
         state.KneeRoll = Mathf.Clamp(state.KneeRoll, kneeRollLimit.x, kneeRollLimit.y);
+        state.AnkleRoll = Mathf.Clamp(state.AnkleRoll, ankleRollLimit.x, ankleRollLimit.y);
 
         Managers.TitanRig.SetLegState(left: IsLeftLeg, state);
         Managers.TitanRig.ApplyLegPose(left: IsLeftLeg);
@@ -181,6 +193,7 @@ public abstract class TitanBaseLegRoleController : TitanBaseController
         targetYaw = Mathf.Clamp(targetYaw, hipYawLimit.x, hipYawLimit.y);
         targetRoll = Mathf.Clamp(targetRoll, hipRollLimit.x, hipRollLimit.y);
         float kneeInput = IsLeftLeg ? -input.LeftLegKnee : -input.RightLegKnee;
+        float ankleInput = IsLeftLeg ? -input.LeftLegAnkle : -input.RightLegAnkle;
 
         return new TitanLegInputCommand
         {
@@ -190,6 +203,7 @@ public abstract class TitanBaseLegRoleController : TitanBaseController
             TargetHipYaw = targetYaw,
             TargetHipRoll = targetRoll,
             KneeInput = kneeInput,
+            AnkleInput = ankleInput,
             DetachHeld = input.RightMouseDetachBuffered || input.RightMouseHeld || input.RightMousePressedThisFrame,
         };
     }
@@ -204,5 +218,6 @@ public struct TitanLegInputCommand
     public float TargetHipYaw;
     public float TargetHipRoll;
     public float KneeInput;
+    public float AnkleInput;
     public bool DetachHeld;
 }

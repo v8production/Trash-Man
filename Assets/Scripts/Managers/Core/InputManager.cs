@@ -95,10 +95,13 @@ public class InputManager
         input.BodyWaist = GetAxis(Key.D, Key.A);
 
         float ws = GetAxis(Key.W, Key.S);
+        bool shiftHeld = IsShiftHeld();
         input.LeftArmElbow = ws;
         input.RightArmElbow = ws;
-        input.LeftLegKnee = ws;
-        input.RightLegKnee = ws;
+        input.LeftLegKnee = shiftHeld ? 0f : ws;
+        input.RightLegKnee = shiftHeld ? 0f : ws;
+        input.LeftLegAnkle = shiftHeld ? ws : 0f;
+        input.RightLegAnkle = shiftHeld ? ws : 0f;
 
         MaybeLogTitanInput(input);
         return input;
@@ -135,6 +138,12 @@ public class InputManager
     {
         Mouse mouse = Mouse.current;
         return mouse != null && mouse.rightButton.wasPressedThisFrame;
+    }
+
+    private bool IsShiftHeld()
+    {
+        Keyboard keyboard = Keyboard.current;
+        return keyboard != null && (keyboard.leftShiftKey.isPressed || keyboard.rightShiftKey.isPressed);
     }
 
     private Vector2 CorrectTitanMousePosition(Vector2 mousePosition)

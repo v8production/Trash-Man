@@ -18,4 +18,6 @@ public struct TitanAggregatedInput
     public float RightArmElbow;
     public float LeftLegKnee;
     public float RightLegKnee;
+    public float LeftLegAnkle;
+    public float RightLegAnkle;
 }
