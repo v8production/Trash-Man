@@ -165,13 +165,6 @@ public class TitanRoleNetworkDriver : MonoBehaviour
             return;
         }
 
-        Define.TitanRole role = left ? Define.TitanRole.LeftLeg : Define.TitanRole.RightLeg;
-        if (Managers.TitanRole.TryGetSelectedRoleInput(role, out TitanAggregatedInput selectedInput))
-        {
-            controller.TickAttachInput(selectedInput);
-            return;
-        }
-
         controller.TickAttachInput(default);
     }
 

@@ -16,7 +16,7 @@ public sealed class TitanLegAnchorResolver : MonoBehaviour
         public readonly Vector3 Position;
         public readonly Quaternion Rotation;
 
-        private WorldPose(Vector3 position, Quaternion rotation)
+        public WorldPose(Vector3 position, Quaternion rotation)
         {
             Position = position;
             Rotation = rotation;
@@ -27,22 +27,11 @@ public sealed class TitanLegAnchorResolver : MonoBehaviour
             return new WorldPose(target.position, target.rotation);
         }
 
-        public void ApplyTo(Transform target)
-        {
-            target.SetPositionAndRotation(Position, Rotation);
-        }
     }
 
     [Header("Attachments")]
     [SerializeField] private FootAttachmentController leftFootAttachment;
     [SerializeField] private FootAttachmentController rightFootAttachment;
-
-    [Header("Anchored Leg Compensation")]
-    [SerializeField] private bool preserveAnchoredThighWorldPose = true;
-
-    [Header("Inverse Movement")]
-    [SerializeField] private float inverseYawScale = 1f;
-    [SerializeField] private float inverseRollScale = 0.75f;
 
     [Header("Anchor Stabilization")]
     [SerializeField] private float singleFootYawCorrectionScale = 1f;
@@ -55,14 +44,6 @@ public sealed class TitanLegAnchorResolver : MonoBehaviour
     private Vector3 lockedRootPosition;
     private Quaternion lockedRootRotation;
     private bool _skipAnchorStabilizationThisFrame;
-
-    private bool _hasPendingAnchoredLegPose;
-    private WorldPose _pendingHipPose;
-    private WorldPose _pendingKneePose;
-    private WorldPose _pendingFootPose;
-    private Transform _pendingHip;
-    private Transform _pendingKnee;
-    private Transform _pendingFoot;
 
     private void Awake()
     {
@@ -80,8 +61,6 @@ public sealed class TitanLegAnchorResolver : MonoBehaviour
         {
             StabilizeAnchors(Time.deltaTime);
         }
-
-        ApplyPendingAnchoredLegPose();
     }
 
     public bool HasAnyAttachedFoot()
@@ -97,7 +76,16 @@ public sealed class TitanLegAnchorResolver : MonoBehaviour
     public void UpdateAttachState(TitanBaseLegRoleController.LegSide side, bool attachHeld)
     {
         FootAttachmentController controller = GetAttachment(side);
-        controller?.SetAttachHeld(attachHeld);
+        if (controller == null)
+        {
+            return;
+        }
+
+        controller.SetAttachHeld(attachHeld);
+        if (attachHeld)
+        {
+            controller.RefreshAttachmentState();
+        }
     }
 
     public bool TryApplyAnchoredMovement(TitanBaseLegRoleController.LegSide side, in TitanLegInputCommand command, in TitanLegControlState currentState, float deltaTime)
@@ -143,35 +131,54 @@ public sealed class TitanLegAnchorResolver : MonoBehaviour
             return;
         }
 
+        bool isLeft = side == TitanBaseLegRoleController.LegSide.Left;
+        TitanLegControlState state = Managers.TitanRig.GetLegState(isLeft);
         bool applied = false;
+
         if (Mathf.Abs(command.AnkleInput) > 0.001f)
         {
-            float angle = command.AnkleInput * command.AnkleSpeed * deltaTime;
-            applied |= TryRotateUpperChain(side, GetFoot(side), angle, GetFootAxis(side), preserveHip: false, preserveKnee: false, preserveFoot: true);
+            Transform foot = GetFoot(side);
+            Transform contactPoint = anchor.BottomProbe;
+            Vector3 anchoredContact = anchor.AttachedWorldPosition;
+            Quaternion anchoredFootRotation = anchor.AttachedWorldRotation;
+
+            state.AnkleRoll = Mathf.Clamp(
+                state.AnkleRoll + (command.AnkleInput * command.AnkleSpeed * deltaTime),
+                command.AnkleRollLimit.x,
+                command.AnkleRollLimit.y
+            );
+            Managers.TitanRig.SetLegState(isLeft, state);
+            Managers.TitanRig.ApplyLegPose(isLeft);
+
+            applied |= RestoreRootToMatchContactAndFootRotation(contactPoint, anchoredContact, foot, anchoredFootRotation);
         }
 
         if (Mathf.Abs(command.KneeInput) > 0.001f)
         {
-            float angle = command.KneeInput * command.KneeSpeed * deltaTime;
-            applied |= TryRotateUpperChain(side, GetKnee(side), angle, GetKneeAxis(side), preserveHip: false, preserveKnee: true, preserveFoot: true);
+            Transform knee = GetKnee(side);
+            Transform contactPoint = anchor.BottomProbe;
+            Vector3 kneePosition = knee != null ? knee.position : Vector3.zero;
+            Vector3 footPosition = anchor.AttachedWorldPosition;
+
+            state.KneeRoll = Mathf.Clamp(
+                state.KneeRoll + (command.KneeInput * command.KneeSpeed * deltaTime),
+                command.KneeRollLimit.x,
+                command.KneeRollLimit.y
+            );
+            Managers.TitanRig.SetLegState(isLeft, state);
+            Managers.TitanRig.ApplyLegPose(isLeft);
+
+            applied |= RestoreRootToMatchTwoPoints(knee, kneePosition, contactPoint, footPosition);
         }
 
         if (Mathf.Abs(command.HipYawDelta) > 0.001f)
         {
-            applied |= TryRotateUpperChain(side, GetHip(side), command.HipYawDelta, Vector3.up, preserveHip: true, preserveKnee: true, preserveFoot: true);
+            applied |= ApplyAnchoredHipDelta(side, isLeft, ref state, command.HipYawDelta, 0f, command);
         }
 
         if (Mathf.Abs(command.HipRollDelta) > 0.001f)
         {
-            Transform hip = GetHip(side);
-            Vector3 axis = hip != null ? Vector3.ProjectOnPlane(hip.forward, Vector3.up) : Vector3.zero;
-            if (axis.sqrMagnitude < 0.0001f)
-            {
-                Transform root = Managers.TitanRig.MovementRoot;
-                axis = root != null ? root.forward : Vector3.forward;
-            }
-
-            applied |= TryRotateUpperChain(side, hip, command.HipRollDelta, axis.normalized, preserveHip: true, preserveKnee: true, preserveFoot: true);
+            applied |= ApplyAnchoredHipDelta(side, isLeft, ref state, 0f, command.HipRollDelta, command);
         }
 
         if (applied)
@@ -180,117 +187,25 @@ public sealed class TitanLegAnchorResolver : MonoBehaviour
         }
     }
 
-    public bool PreserveAnchoredThighWorldPose => preserveAnchoredThighWorldPose;
-
-    public void ApplyCompensatedRootDelta(Transform anchoredThigh, Vector3 beforePos, Quaternion beforeRot)
-    {
-        if (anchoredThigh == null)
-        {
-            return;
-        }
-
-        Transform root = Managers.TitanRig.MovementRoot;
-        if (root == null)
-        {
-            return;
-        }
-
-        Vector3 afterPos = anchoredThigh.position;
-        Quaternion afterRot = anchoredThigh.rotation;
-
-        // delta maps 'after' thigh pose back to 'before'.
-        Quaternion deltaRot = beforeRot * Quaternion.Inverse(afterRot);
-        Vector3 deltaPos = beforePos - (deltaRot * afterPos);
-
-        Vector3 nextRootPos = (deltaRot * root.position) + deltaPos;
-        Quaternion nextRootRot = deltaRot * root.rotation;
-        Managers.TitanRig.ApplyMovementRootPose(nextRootPos, nextRootRot, zeroVelocities: false);
-    }
-
-    public void ApplyInverseRootFromHipDelta(
+    private bool ApplyAnchoredHipDelta(
         TitanBaseLegRoleController.LegSide side,
-        float hipYawDelta,
-        float hipRollDelta)
+        bool isLeft,
+        ref TitanLegControlState state,
+        float yawDelta,
+        float rollDelta,
+        in TitanLegInputCommand command)
     {
-        ResolveReferences();
+        Transform hip = GetHip(side);
+        Transform knee = GetKnee(side);
+        Vector3 hipPosition = hip != null ? hip.position : Vector3.zero;
+        Vector3 kneePosition = knee != null ? knee.position : Vector3.zero;
 
-        if (!Managers.TitanRig.EnsureReady())
-        {
-            return;
-        }
+        state.HipYaw = Mathf.Clamp(state.HipYaw + yawDelta, command.HipYawLimit.x, command.HipYawLimit.y);
+        state.HipRoll = Mathf.Clamp(state.HipRoll + rollDelta, command.HipRollLimit.x, command.HipRollLimit.y);
+        Managers.TitanRig.SetLegState(isLeft, state);
+        Managers.TitanRig.ApplyLegPose(isLeft);
 
-        AnchorMode mode = GetAnchorMode();
-
-        if (mode == AnchorMode.Locked)
-        {
-            return;
-        }
-
-        bool isLeft = side == TitanBaseLegRoleController.LegSide.Left;
-
-        if ((isLeft && mode != AnchorMode.LeftAnchored) ||
-            (!isLeft && mode != AnchorMode.RightAnchored))
-        {
-            return;
-        }
-
-        Transform movementRoot = Managers.TitanRig.MovementRoot;
-        FootAttachmentController anchor = GetAttachment(side);
-
-        if (movementRoot == null || anchor == null || !anchor.IsAttached)
-        {
-            return;
-        }
-
-        Transform anchoredHip = isLeft
-            ? Managers.TitanRig.LeftHip
-            : Managers.TitanRig.RightHip;
-
-        Transform anchoredKnee = isLeft
-            ? Managers.TitanRig.LeftKnee
-            : Managers.TitanRig.RightKnee;
-
-        Transform anchoredFoot = isLeft
-            ? Managers.TitanRig.LeftFoot
-            : Managers.TitanRig.RightFoot;
-
-        if (anchoredHip == null || anchoredKnee == null || anchoredFoot == null)
-        {
-            return;
-        }
-
-        WorldPose hipPose = WorldPose.Capture(anchoredHip);
-        WorldPose kneePose = WorldPose.Capture(anchoredKnee);
-        WorldPose footPose = WorldPose.Capture(anchoredFoot);
-
-        float inverseYaw = Mathf.Clamp(-hipYawDelta * inverseYawScale, -3f, 3f);
-        float inverseRoll = Mathf.Clamp(-hipRollDelta * inverseRollScale, -3f, 3f);
-
-        Vector3 rollAxis = Vector3.ProjectOnPlane(anchoredHip.forward, Vector3.up);
-
-        if (rollAxis.sqrMagnitude < 0.0001f)
-        {
-            rollAxis = movementRoot.forward;
-        }
-
-        Quaternion yawRotation = Quaternion.AngleAxis(inverseYaw, Vector3.up);
-        Quaternion rollRotation = Quaternion.AngleAxis(inverseRoll, rollAxis.normalized);
-        Quaternion combinedRotation = yawRotation * rollRotation;
-
-        Vector3 pivot = hipPose.Position;
-        Vector3 rootOffset = movementRoot.position - pivot;
-
-        Vector3 nextRootPosition = pivot + combinedRotation * rootOffset;
-        Quaternion nextRootRotation = combinedRotation * movementRoot.rotation;
-
-        Managers.TitanRig.ApplyMovementRootPose(
-            nextRootPosition,
-            nextRootRotation,
-            zeroVelocities: false
-        );
-
-        QueuePendingPose(anchoredHip, hipPose, anchoredKnee, kneePose, anchoredFoot, footPose);
-        _skipAnchorStabilizationThisFrame = true;
+        return RestoreRootToMatchTwoPoints(hip, hipPosition, knee, kneePosition);
     }
 
     public void StabilizeNow(float deltaTime)
@@ -476,47 +391,41 @@ public sealed class TitanLegAnchorResolver : MonoBehaviour
         return side == TitanBaseLegRoleController.LegSide.Left ? leftFootAttachment : rightFootAttachment;
     }
 
-    private bool TryRotateUpperChain(
-        TitanBaseLegRoleController.LegSide side,
-        Transform pivotTransform,
-        float angleDegrees,
-        Vector3 worldAxis,
-        bool preserveHip,
-        bool preserveKnee,
-        bool preserveFoot)
+    private bool RestoreRootToMatchContactAndFootRotation(Transform contactPoint, Vector3 desiredContactPosition, Transform foot, Quaternion desiredFootRotation)
     {
         Transform root = Managers.TitanRig.MovementRoot;
-        if (root == null || pivotTransform == null || worldAxis.sqrMagnitude < 0.0001f || Mathf.Abs(angleDegrees) <= 0.0001f)
+        if (root == null || contactPoint == null || foot == null)
         {
             return false;
         }
 
-        Transform hip = GetHip(side);
-        Transform knee = GetKnee(side);
-        Transform foot = GetFoot(side);
-        WorldPose hipPose = hip != null ? WorldPose.Capture(hip) : default;
-        WorldPose kneePose = knee != null ? WorldPose.Capture(knee) : default;
-        WorldPose footPose = foot != null ? WorldPose.Capture(foot) : default;
-
-        Quaternion rotation = Quaternion.AngleAxis(angleDegrees, worldAxis.normalized);
-        Vector3 pivot = pivotTransform.position;
-        Vector3 nextRootPosition = pivot + rotation * (root.position - pivot);
-        Quaternion nextRootRotation = rotation * root.rotation;
-        Managers.TitanRig.ApplyMovementRootPose(nextRootPosition, nextRootRotation, zeroVelocities: false);
-
-        QueuePendingPose(preserveHip ? hip : null, hipPose, preserveKnee ? knee : null, kneePose, preserveFoot ? foot : null, footPose);
+        Quaternion correction = desiredFootRotation * Quaternion.Inverse(foot.rotation);
+        Vector3 correctedRootPosition = desiredContactPosition + correction * (root.position - contactPoint.position);
+        Quaternion correctedRootRotation = correction * root.rotation;
+        Managers.TitanRig.ApplyMovementRootPose(correctedRootPosition, correctedRootRotation, zeroVelocities: false);
         return true;
     }
 
-    private void QueuePendingPose(Transform hip, WorldPose hipPose, Transform knee, WorldPose kneePose, Transform foot, WorldPose footPose)
+    private bool RestoreRootToMatchTwoPoints(Transform pointA, Vector3 desiredA, Transform pointB, Vector3 desiredB)
     {
-        _pendingHip = hip;
-        _pendingKnee = knee;
-        _pendingFoot = foot;
-        _pendingHipPose = hipPose;
-        _pendingKneePose = kneePose;
-        _pendingFootPose = footPose;
-        _hasPendingAnchoredLegPose = true;
+        Transform root = Managers.TitanRig.MovementRoot;
+        if (root == null || pointA == null || pointB == null)
+        {
+            return false;
+        }
+
+        Vector3 currentSpan = pointB.position - pointA.position;
+        Vector3 desiredSpan = desiredB - desiredA;
+        Quaternion correction = Quaternion.identity;
+        if (currentSpan.sqrMagnitude > 0.000001f && desiredSpan.sqrMagnitude > 0.000001f)
+        {
+            correction = Quaternion.FromToRotation(currentSpan, desiredSpan);
+        }
+
+        Vector3 correctedRootPosition = desiredA + correction * (root.position - pointA.position);
+        Quaternion correctedRootRotation = correction * root.rotation;
+        Managers.TitanRig.ApplyMovementRootPose(correctedRootPosition, correctedRootRotation, zeroVelocities: false);
+        return true;
     }
 
     private Transform GetHip(TitanBaseLegRoleController.LegSide side)
@@ -532,18 +441,6 @@ public sealed class TitanLegAnchorResolver : MonoBehaviour
     private Transform GetFoot(TitanBaseLegRoleController.LegSide side)
     {
         return side == TitanBaseLegRoleController.LegSide.Left ? Managers.TitanRig.LeftFoot : Managers.TitanRig.RightFoot;
-    }
-
-    private Vector3 GetKneeAxis(TitanBaseLegRoleController.LegSide side)
-    {
-        Transform knee = GetKnee(side);
-        return knee != null ? knee.forward : Vector3.forward;
-    }
-
-    private Vector3 GetFootAxis(TitanBaseLegRoleController.LegSide side)
-    {
-        Transform foot = GetFoot(side);
-        return foot != null ? foot.forward : Vector3.forward;
     }
 
     public bool IsFootAttached(TitanBaseLegRoleController.LegSide side)
@@ -577,33 +474,5 @@ public sealed class TitanLegAnchorResolver : MonoBehaviour
                 rightFootAttachment ??= attachment;
             }
         }
-    }
-    private void ApplyPendingAnchoredLegPose()
-    {
-        if (!_hasPendingAnchoredLegPose)
-        {
-            return;
-        }
-
-        _hasPendingAnchoredLegPose = false;
-
-        if (_pendingHip != null)
-        {
-            _pendingHipPose.ApplyTo(_pendingHip);
-        }
-
-        if (_pendingKnee != null)
-        {
-            _pendingKneePose.ApplyTo(_pendingKnee);
-        }
-
-        if (_pendingFoot != null)
-        {
-            _pendingFootPose.ApplyTo(_pendingFoot);
-        }
-
-        _pendingHip = null;
-        _pendingKnee = null;
-        _pendingFoot = null;
     }
 }

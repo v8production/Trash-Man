@@ -104,6 +104,7 @@ public sealed class TitanRigRuntime : MonoBehaviour
         {
             movementRigidbody.position = worldPosition;
             movementRigidbody.rotation = worldRotation;
+            movementRigidbody.transform.SetPositionAndRotation(worldPosition, worldRotation);
 
             if (zeroVelocities)
             {

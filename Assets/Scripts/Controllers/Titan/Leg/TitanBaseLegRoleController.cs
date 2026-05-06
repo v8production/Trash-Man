@@ -82,11 +82,6 @@ public abstract class TitanBaseLegRoleController : TitanBaseController
         if (legAnchorResolver != null &&
             legAnchorResolver.TryApplyAnchoredMovement(command.Side, command, state, deltaTime))
         {
-            if (roleActivated)
-            {
-                return;
-            }
-
             legAnchorResolver.ApplyAnchoredLegCommand(command.Side, command, deltaTime);
             return;
         }
@@ -202,6 +197,10 @@ public abstract class TitanBaseLegRoleController : TitanBaseController
             AnkleInput = ankleInput,
             KneeSpeed = kneeSpeed,
             AnkleSpeed = ankleSpeed,
+            HipYawLimit = hipYawLimit,
+            HipRollLimit = hipRollLimit,
+            KneeRollLimit = kneeRollLimit,
+            AnkleRollLimit = ankleRollLimit,
             HipYawDelta = yawDelta,
             HipRollDelta = rollDelta,
             AttachHeld = input.RightMouseHeld || input.RightMouseAttachBuffered,
@@ -221,6 +220,10 @@ public struct TitanLegInputCommand
     public float AnkleInput;
     public float KneeSpeed;
     public float AnkleSpeed;
+    public Vector2 HipYawLimit;
+    public Vector2 HipRollLimit;
+    public Vector2 KneeRollLimit;
+    public Vector2 AnkleRollLimit;
     public float HipYawDelta;
     public float HipRollDelta;
     public bool AttachHeld;

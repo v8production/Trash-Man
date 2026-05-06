@@ -13,9 +13,6 @@ public class InputManager
     private CursorLockMode _lastCursorLockMode;
     private float _nextTitanInputLogTime;
     private const float TitanInputLogIntervalSeconds = 0.20f;
-    private const bool UseTitanSingleAxisCorrection = false;
-    private const float TitanSingleAxisDeadZonePixels = 2f;
-    private const float TitanHorizontalAssistBiasPixels = 18f;
     private const float TitanMouseSensitivity = 5f;
 
     public Define.InputMode Mode { get; private set; } = Define.InputMode.Player;
@@ -86,7 +83,6 @@ public class InputManager
 
         input.MouseDelta = ReadTitanMouseDelta();
         input.MousePosition = ReadMousePosition();
-        input.MousePosition = CorrectTitanMousePosition(input.MousePosition);
         input.RightMouseHeld = IsRightMouseHeld();
         input.RightMousePressedThisFrame = WasRightMousePressedThisFrame();
         input.TorsoForward = GetAxis(Key.UpArrow, Key.DownArrow);
@@ -144,20 +140,6 @@ public class InputManager
     {
         Keyboard keyboard = Keyboard.current;
         return keyboard != null && (keyboard.leftShiftKey.isPressed || keyboard.rightShiftKey.isPressed);
-    }
-
-    private Vector2 CorrectTitanMousePosition(Vector2 mousePosition)
-    {
-        if (!UseTitanSingleAxisCorrection)
-            return mousePosition;
-
-        Vector2 origin = new(Screen.width * 0.5f, Screen.height * 0.5f);
-        Vector2 fromOrigin = mousePosition - origin;
-        Vector2 dominant = TitanInputUtility.KeepDominantAxisWithHorizontalBias(
-            fromOrigin,
-            TitanSingleAxisDeadZonePixels,
-            TitanHorizontalAssistBiasPixels);
-        return origin + dominant;
     }
 
     public Vector2 ReadMousePosition()
