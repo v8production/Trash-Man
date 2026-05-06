@@ -49,9 +49,9 @@ public class TitanRoleManager
 
             _roleMasksByClientId[player.OwnerClientId] = roleMask;
 
-            for (int roleValue = (int)Define.TitanRole.Body; roleValue <= (int)Define.TitanRole.RightLeg; roleValue++)
+            for (int roleValue = (int)Define.TitanRole.Torso; roleValue <= (int)Define.TitanRole.RightLeg; roleValue++)
             {
-                int bit = 1 << (roleValue - (int)Define.TitanRole.Body);
+                int bit = 1 << (roleValue - (int)Define.TitanRole.Torso);
                 if ((roleMask & bit) == 0)
                     continue;
 
@@ -82,7 +82,7 @@ public class TitanRoleManager
 
         if (requireAllRoles)
         {
-            for (int roleValue = (int)Define.TitanRole.Body; roleValue <= (int)Define.TitanRole.RightLeg; roleValue++)
+            for (int roleValue = (int)Define.TitanRole.Torso; roleValue <= (int)Define.TitanRole.RightLeg; roleValue++)
             {
                 Define.TitanRole role = (Define.TitanRole)roleValue;
                 if (!_playersByRole.ContainsKey(role))
@@ -104,7 +104,7 @@ public class TitanRoleManager
 
     public bool TryGetLocalRole(out Define.TitanRole role)
     {
-        role = Define.TitanRole.Body;
+        role = Define.TitanRole.Torso;
         if (!RefreshRoleMap(false, out _))
             return false;
 
@@ -115,9 +115,9 @@ public class TitanRoleManager
         if (!_roleMasksByClientId.TryGetValue(networkManager.LocalClientId, out int roleMask) || roleMask == 0)
             return false;
 
-        for (int roleValue = (int)Define.TitanRole.Body; roleValue <= (int)Define.TitanRole.RightLeg; roleValue++)
+        for (int roleValue = (int)Define.TitanRole.Torso; roleValue <= (int)Define.TitanRole.RightLeg; roleValue++)
         {
-            int bit = 1 << (roleValue - (int)Define.TitanRole.Body);
+            int bit = 1 << (roleValue - (int)Define.TitanRole.Torso);
             if ((roleMask & bit) != 0)
             {
                 role = (Define.TitanRole)roleValue;

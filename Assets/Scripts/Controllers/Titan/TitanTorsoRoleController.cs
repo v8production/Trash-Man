@@ -1,13 +1,13 @@
 using UnityEngine;
 
-public class TitanBodyRoleController : TitanBaseController
+public class TitanTorsoRoleController : TitanBaseController
 {
 
-    [Header("Body Input")]
+    [Header("Torso Input")]
     [SerializeField] private float moveSpeed = 3.5f;
     [SerializeField] private float strafeSpeed = 1.75f;
     [SerializeField] private float turnSpeed = 75f;
-    [SerializeField] private float bodySmoothing = 8f;
+    [SerializeField] private float torsoSmoothing = 8f;
 
     [Header("Waist Rotation")]
     [SerializeField] private float waistTurnSpeed = 120f;
@@ -51,7 +51,7 @@ public class TitanBodyRoleController : TitanBaseController
     private bool inputEnabled = true;
     private bool anchorPhysicsOverride;
 
-    public override Define.TitanRole Role => Define.TitanRole.Body;
+    public override Define.TitanRole Role => Define.TitanRole.Torso;
 
     protected override void Awake()
     {
@@ -105,10 +105,10 @@ public class TitanBodyRoleController : TitanBaseController
             return;
         }
 
-        forwardInput = input.BodyForward;
-        strafeInput = input.BodyStrafe;
-        turnInput = input.BodyTurn;
-        UpdateWaistRotation(input.BodyWaist, deltaTime);
+        forwardInput = input.TorsoForward;
+        strafeInput = input.TorsoStrafe;
+        turnInput = input.TorsoTurn;
+        UpdateWaistRotation(input.TorsoWaist, deltaTime);
     }
 
     public void TickPhysics(float deltaTime)
@@ -149,7 +149,7 @@ public class TitanBodyRoleController : TitanBaseController
             (flatForward * (forwardInput * moveSpeed)) +
             (flatRight * (strafeInput * strafeSpeed));
 
-        planarVelocity = Vector3.Lerp(planarVelocity, desiredPlanarVelocity, 1f - Mathf.Exp(-bodySmoothing * deltaTime));
+        planarVelocity = Vector3.Lerp(planarVelocity, desiredPlanarVelocity, 1f - Mathf.Exp(-torsoSmoothing * deltaTime));
 
         bool leftGrounded = IsFootGrounded(leftFoot);
         bool rightGrounded = IsFootGrounded(rightFoot);
@@ -157,7 +157,7 @@ public class TitanBodyRoleController : TitanBaseController
 
         if (!grounded)
         {
-            grounded = IsBodyGrounded(movementRoot);
+            grounded = IsTorsoGrounded(movementRoot);
         }
 
         if (movementRigidbody != null)
@@ -388,7 +388,7 @@ public class TitanBodyRoleController : TitanBaseController
         return null;
     }
 
-    private bool IsBodyGrounded(Transform movementRoot)
+    private bool IsTorsoGrounded(Transform movementRoot)
     {
         Vector3 origin = movementRoot.position + (Vector3.up * groundProbeHeight);
         float distance = groundProbeHeight + groundProbeDistance;
@@ -460,6 +460,6 @@ public class TitanBodyRoleController : TitanBaseController
             waistYawLimit.y);
 
         Managers.TitanRig.SetWaistYaw(nextWaistYaw);
-        Managers.TitanRig.ApplyBodyPose();
+        Managers.TitanRig.ApplyTorsoPose();
     }
 }

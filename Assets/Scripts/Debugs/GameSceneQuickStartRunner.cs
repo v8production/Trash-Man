@@ -93,7 +93,7 @@ public class GameSceneQuickStartRunner : MonoBehaviour
 
     private void EnsureAllRolesSelected(LobbyNetworkPlayer localPlayer)
     {
-        SelectRoleIfMissing(localPlayer, Define.TitanRole.Body);
+        SelectRoleIfMissing(localPlayer, Define.TitanRole.Torso);
         SelectRoleIfMissing(localPlayer, Define.TitanRole.LeftArm);
         SelectRoleIfMissing(localPlayer, Define.TitanRole.RightArm);
         SelectRoleIfMissing(localPlayer, Define.TitanRole.LeftLeg);
@@ -110,7 +110,7 @@ public class GameSceneQuickStartRunner : MonoBehaviour
 
     private static bool HasAllRoles(LobbyNetworkPlayer localPlayer)
     {
-        return localPlayer.HasSelectedTitanRoleValue(Define.TitanRole.Body)
+        return localPlayer.HasSelectedTitanRoleValue(Define.TitanRole.Torso)
             && localPlayer.HasSelectedTitanRoleValue(Define.TitanRole.LeftArm)
             && localPlayer.HasSelectedTitanRoleValue(Define.TitanRole.RightArm)
             && localPlayer.HasSelectedTitanRoleValue(Define.TitanRole.LeftLeg)

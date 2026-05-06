@@ -62,7 +62,7 @@ public class Define
 
     public enum TitanRole
     {
-        Body = 1,
+        Torso = 1,
         LeftArm = 2,
         RightArm = 3,
         LeftLeg = 4,

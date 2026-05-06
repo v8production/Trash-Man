@@ -9,10 +9,10 @@ public struct TitanAggregatedInput
     public bool RightMousePressedThisFrame;
     public bool RightMouseDetachBuffered;
 
-    public float BodyForward;
-    public float BodyStrafe;
-    public float BodyTurn;
-    public float BodyWaist;
+    public float TorsoForward;
+    public float TorsoStrafe;
+    public float TorsoTurn;
+    public float TorsoWaist;
 
     public float LeftArmElbow;
     public float RightArmElbow;

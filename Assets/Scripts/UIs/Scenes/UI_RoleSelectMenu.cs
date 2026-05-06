@@ -21,7 +21,7 @@ public class UI_RoleSelectMenu : UI_Scene
     private enum Buttons
     {
         Cancel,
-        Body,
+        Torso,
         LeftArm,
         RightArm,
         LeftLeg,
@@ -30,7 +30,7 @@ public class UI_RoleSelectMenu : UI_Scene
 
     enum Texts
     {
-        BodyNickname,
+        TorsoNickname,
         LeftArmNickname,
         RightArmNickname,
         LeftLegNickname,
@@ -52,7 +52,7 @@ public class UI_RoleSelectMenu : UI_Scene
         Bind<TextMeshProUGUI>(typeof(Texts));
 
         GetButton((int)Buttons.Cancel).gameObject.BindEvent(OnCancelClicked);
-        GetButton((int)Buttons.Body).gameObject.BindEvent(_ => NotifyRoleSelected(Define.TitanRole.Body));
+        GetButton((int)Buttons.Torso).gameObject.BindEvent(_ => NotifyRoleSelected(Define.TitanRole.Torso));
         GetButton((int)Buttons.LeftArm).gameObject.BindEvent(_ => NotifyRoleSelected(Define.TitanRole.LeftArm));
         GetButton((int)Buttons.RightArm).gameObject.BindEvent(_ => NotifyRoleSelected(Define.TitanRole.RightArm));
         GetButton((int)Buttons.LeftLeg).gameObject.BindEvent(_ => NotifyRoleSelected(Define.TitanRole.LeftLeg));
@@ -134,7 +134,7 @@ public class UI_RoleSelectMenu : UI_Scene
                     ? $"{displayName} ({selectedRoleCount}개 역할)"
                     : displayName;
 
-                AddRoleNameIfSelected(namesByRole, Define.TitanRole.Body, roleMask, formattedName);
+                AddRoleNameIfSelected(namesByRole, Define.TitanRole.Torso, roleMask, formattedName);
                 AddRoleNameIfSelected(namesByRole, Define.TitanRole.LeftArm, roleMask, formattedName);
                 AddRoleNameIfSelected(namesByRole, Define.TitanRole.RightArm, roleMask, formattedName);
                 AddRoleNameIfSelected(namesByRole, Define.TitanRole.LeftLeg, roleMask, formattedName);
@@ -142,7 +142,7 @@ public class UI_RoleSelectMenu : UI_Scene
             }
         }
 
-        ApplyRoleNicknameText(namesByRole, Define.TitanRole.Body, Texts.BodyNickname);
+        ApplyRoleNicknameText(namesByRole, Define.TitanRole.Torso, Texts.TorsoNickname);
         ApplyRoleNicknameText(namesByRole, Define.TitanRole.LeftArm, Texts.LeftArmNickname);
         ApplyRoleNicknameText(namesByRole, Define.TitanRole.RightArm, Texts.RightArmNickname);
         ApplyRoleNicknameText(namesByRole, Define.TitanRole.LeftLeg, Texts.LeftLegNickname);
@@ -168,7 +168,7 @@ public class UI_RoleSelectMenu : UI_Scene
     private static void AddRoleNameIfSelected(Dictionary<Define.TitanRole, List<string>> namesByRole, Define.TitanRole role, int roleMask, string displayName)
     {
         int roleValue = (int)role;
-        int bit = 1 << (roleValue - (int)Define.TitanRole.Body);
+        int bit = 1 << (roleValue - (int)Define.TitanRole.Torso);
         if ((roleMask & bit) == 0)
             return;
 
@@ -198,7 +198,7 @@ public class UI_RoleSelectMenu : UI_Scene
     {
         return role switch
         {
-            Define.TitanRole.Body => "Center",
+            Define.TitanRole.Torso => "Center",
             Define.TitanRole.LeftArm => "Left Arm",
             Define.TitanRole.RightArm => "Right Arm",
             Define.TitanRole.LeftLeg => "Left Leg",

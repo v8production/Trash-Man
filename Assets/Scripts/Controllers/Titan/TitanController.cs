@@ -8,7 +8,7 @@ public class TitanController : MonoBehaviour
     [Header("References")]
     [SerializeField] private TitanRigRuntime rigRuntime;
     [SerializeField] private TitanLegAnchorResolver legAnchorResolver;
-    [SerializeField] private TitanBodyRoleController bodyController;
+    [SerializeField] private TitanTorsoRoleController torsoController;
     [SerializeField] private TitanLeftArmRoleController leftArmController;
     [SerializeField] private TitanRightArmRoleController rightArmController;
     [SerializeField] private TitanLeftLegRoleController leftLegController;
@@ -37,7 +37,7 @@ public class TitanController : MonoBehaviour
             Managers.TitanRig.Bind(rigRuntime);
 
         legAnchorResolver = RequireComponent(legAnchorResolver);
-        bodyController = RequireComponent(bodyController);
+        torsoController = RequireComponent(torsoController);
         leftArmController = RequireComponent(leftArmController);
         rightArmController = RequireComponent(rightArmController);
         leftLegController = RequireComponent(leftLegController);

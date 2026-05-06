@@ -49,7 +49,7 @@ public sealed class TitanLegAnchorResolver : MonoBehaviour
     [SerializeField] private float singleFootYawCorrectionSpeed = 12f;
     [SerializeField] private float singleFootMaxYawCorrectionDegreesPerFrame = 2.5f;
     [SerializeField] private float singleFootYawDeadZoneDegrees = 0.25f;
-    [SerializeField] private bool zeroBodyVelocityWhenLocked = true;
+    [SerializeField] private bool zeroTorsoVelocityWhenLocked = true;
 
     private bool wasLocked;
     private Vector3 lockedRootPosition;
@@ -284,16 +284,16 @@ public sealed class TitanLegAnchorResolver : MonoBehaviour
         switch (mode)
         {
             case AnchorMode.LeftAnchored:
-                ApplySingleAnchorLock(leftFootAttachment, deltaTime, zeroBodyVelocityWhenLocked: false);
+                ApplySingleAnchorLock(leftFootAttachment, deltaTime, zeroTorsoVelocityWhenLocked: false);
                 break;
             case AnchorMode.RightAnchored:
-                ApplySingleAnchorLock(rightFootAttachment, deltaTime, zeroBodyVelocityWhenLocked: false);
+                ApplySingleAnchorLock(rightFootAttachment, deltaTime, zeroTorsoVelocityWhenLocked: false);
                 break;
             case AnchorMode.Locked:
                 // When both feet are attached, do NOT attempt corrective yaw/translation based on current contact points.
                 // Any tiny foot transform jitter (IK/animation) will feedback into root correction and cause drift/spin.
                 // Hard-lock the movement root pose instead.
-                ApplyLockedRootPose(zeroBodyVelocityWhenLocked);
+                ApplyLockedRootPose(zeroTorsoVelocityWhenLocked);
                 break;
         }
     }
@@ -309,7 +309,7 @@ public sealed class TitanLegAnchorResolver : MonoBehaviour
         Managers.TitanRig.ApplyMovementRootPose(lockedRootPosition, lockedRootRotation, zeroVelocities);
     }
 
-    private void ApplySingleAnchorLock(FootAttachmentController attachment, float deltaTime, bool zeroBodyVelocityWhenLocked)
+    private void ApplySingleAnchorLock(FootAttachmentController attachment, float deltaTime, bool zeroTorsoVelocityWhenLocked)
     {
         Transform movableRoot = Managers.TitanRig.MovementRoot;
         if (movableRoot == null || attachment == null || !attachment.IsAttached || attachment.FootTransform == null)
@@ -344,7 +344,7 @@ public sealed class TitanLegAnchorResolver : MonoBehaviour
                 Quaternion yawRotation = Quaternion.AngleAxis(step, Vector3.up);
                 Vector3 rotatedPosition = desiredPivot + (yawRotation * (movableRoot.position - desiredPivot));
                 nextRotation = yawRotation * nextRotation;
-                Managers.TitanRig.ApplyMovementRootPose(rotatedPosition, nextRotation, zeroBodyVelocityWhenLocked);
+                Managers.TitanRig.ApplyMovementRootPose(rotatedPosition, nextRotation, zeroTorsoVelocityWhenLocked);
                 currentPivot = attachment.GetCurrentContactPoint();
             }
         }
@@ -358,7 +358,7 @@ public sealed class TitanLegAnchorResolver : MonoBehaviour
             return;
         }
 
-        Managers.TitanRig.ApplyMovementRootPose(movableRoot.position + translationDelta, movableRoot.rotation, zeroBodyVelocityWhenLocked);
+        Managers.TitanRig.ApplyMovementRootPose(movableRoot.position + translationDelta, movableRoot.rotation, zeroTorsoVelocityWhenLocked);
     }
 
     private void ApplyDualAnchorLock(bool zeroVelocities)

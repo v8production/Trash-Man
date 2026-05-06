@@ -591,7 +591,7 @@ MonoBehaviour:
   attachControllersOnAwake: 1
   rigRuntime: {fileID: 3344556677889901002}
   legAnchorResolver: {fileID: 8941766507078927944}
-  bodyController: {fileID: 3344556677889901003}
+  torsoController: {fileID: 3344556677889901003}
   leftArmController: {fileID: 3344556677889901004}
   rightArmController: {fileID: 3344556677889901005}
   leftLegController: {fileID: 3344556677889901006}
@@ -608,7 +608,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 95961ef3b977512027eaab6c83fac161, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::TitanRoleNetworkDriver
-  _bodyController: {fileID: 3344556677889901003}
+  _torsoController: {fileID: 3344556677889901003}
   _legAnchorResolver: {fileID: 8941766507078927944}
   _leftArmController: {fileID: 3344556677889901004}
   _rightArmController: {fileID: 3344556677889901005}
@@ -666,11 +666,11 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 92fce1c641312f24c8dda8374fce8e28, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::TitanBodyRoleController
+  m_EditorClassIdentifier: Assembly-CSharp::TitanTorsoRoleController
   moveSpeed: 3.5
   strafeSpeed: 1.75
   turnSpeed: 75
-  bodySmoothing: 8
+  torsoSmoothing: 8
   waistTurnSpeed: 120
   waistYawLimit: {x: -180, y: 180}
   gravityScale: 1
@@ -801,7 +801,7 @@ MonoBehaviour:
   singleFootYawCorrectionSpeed: 12
   singleFootMaxYawCorrectionDegreesPerFrame: 2.5
   singleFootYawDeadZoneDegrees: 0.25
-  zeroBodyVelocityWhenLocked: 1
+  zeroTorsoVelocityWhenLocked: 1
 --- !u!114 &4379125399005193119
 MonoBehaviour:
   m_ObjectHideFlags: 0

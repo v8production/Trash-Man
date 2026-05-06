@@ -7,7 +7,7 @@ public class TitanRoleNetworkDriver : MonoBehaviour
     private const float DebugLogIntervalSeconds = 0.50f;
     private bool _shouldLogThisFrame;
     [Header("Role Controllers")]
-    [SerializeField] private TitanBodyRoleController _bodyController;
+    [SerializeField] private TitanTorsoRoleController _torsoController;
     [SerializeField] private TitanLegAnchorResolver _legAnchorResolver;
     [SerializeField] private TitanLeftArmRoleController _leftArmController;
     [SerializeField] private TitanRightArmRoleController _rightArmController;
@@ -34,7 +34,7 @@ public class TitanRoleNetworkDriver : MonoBehaviour
 
         RestoreServerPhysicsMode();
 
-        if (_bodyController == null && _leftArmController == null && _rightArmController == null && _leftLegController == null && _rightLegController == null)
+        if (_torsoController == null && _leftArmController == null && _rightArmController == null && _leftLegController == null && _rightLegController == null)
             return;
 
         _shouldLogThisFrame = InputDebug.Enabled && Time.unscaledTime >= _nextDebugLogTime;
@@ -51,7 +51,7 @@ public class TitanRoleNetworkDriver : MonoBehaviour
         ApplyLegDetachPrepass(true, hasLeftLegInput, in leftLegInput, dt);
         ApplyLegDetachPrepass(false, hasRightLegInput, in rightLegInput, dt);
 
-        TickBodyRole(dt);
+        TickTorsoRole(dt);
         TickArmRole(true, dt);
         TickArmRole(false, dt);
         TickLegRole(true, hasLeftLegInput, in leftLegInput, dt);
@@ -117,17 +117,17 @@ public class TitanRoleNetworkDriver : MonoBehaviour
         LobbyNetworkPlayer.TryPublishServerTitanPose(new TitanRigPosePayload(snapshot));
     }
 
-    private void TickBodyRole(float dt)
+    private void TickTorsoRole(float dt)
     {
-        if (_bodyController == null)
+        if (_torsoController == null)
             return;
 
         bool anchorActive = _legAnchorResolver != null && _legAnchorResolver.HasAnyAttachedFoot();
-        _bodyController.SetAnchorPhysicsOverride(anchorActive);
-        Managers.TitanRole.TryGetRoleInput(Define.TitanRole.Body, out TitanAggregatedInput input);
-        _bodyController.SetInputEnabled(true);
-        _bodyController.TickRoleInput(input, dt);
-        _bodyController.TickPhysics(dt);
+        _torsoController.SetAnchorPhysicsOverride(anchorActive);
+        Managers.TitanRole.TryGetRoleInput(Define.TitanRole.Torso, out TitanAggregatedInput input);
+        _torsoController.SetInputEnabled(true);
+        _torsoController.TickRoleInput(input, dt);
+        _torsoController.TickPhysics(dt);
     }
 
     private void TickArmRole(bool left, float dt)
@@ -183,7 +183,7 @@ public class TitanRoleNetworkDriver : MonoBehaviour
 
     private void ResolveControllers()
     {
-        _bodyController ??= GetComponent<TitanBodyRoleController>();
+        _torsoController ??= GetComponent<TitanTorsoRoleController>();
         _legAnchorResolver ??= GetComponent<TitanLegAnchorResolver>();
         _leftArmController ??= GetComponent<TitanLeftArmRoleController>();
         _rightArmController ??= GetComponent<TitanRightArmRoleController>();

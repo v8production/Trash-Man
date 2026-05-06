@@ -286,7 +286,7 @@ GameObject:
   - component: {fileID: 8980371133637394566}
   - component: {fileID: 3687701669580384187}
   m_Layer: 5
-  m_Name: BodyNickname
+  m_Name: TorsoNickname
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -1144,7 +1144,7 @@ GameObject:
   - component: {fileID: 1772777851745828201}
   - component: {fileID: 5689748885371042122}
   m_Layer: 5
-  m_Name: Body
+  m_Name: Torso
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -1197,7 +1197,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: 'Body
+  m_text: 'Torso
 
 '
   m_isRightToLeft: 0
@@ -1937,7 +1937,7 @@ GameObject:
   - component: {fileID: 1056917673847636712}
   - component: {fileID: 4314136366079866643}
   m_Layer: 5
-  m_Name: Body
+  m_Name: Torso
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0

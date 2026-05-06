@@ -89,10 +89,10 @@ public class InputManager
         input.MousePosition = CorrectTitanMousePosition(input.MousePosition);
         input.RightMouseHeld = IsRightMouseHeld();
         input.RightMousePressedThisFrame = WasRightMousePressedThisFrame();
-        input.BodyForward = GetAxis(Key.UpArrow, Key.DownArrow);
-        input.BodyStrafe = GetAxis(Key.RightArrow, Key.LeftArrow);
-        input.BodyTurn = GetAxis(Key.Period, Key.Comma);
-        input.BodyWaist = GetAxis(Key.D, Key.A);
+        input.TorsoForward = GetAxis(Key.UpArrow, Key.DownArrow);
+        input.TorsoStrafe = GetAxis(Key.RightArrow, Key.LeftArrow);
+        input.TorsoTurn = GetAxis(Key.Period, Key.Comma);
+        input.TorsoWaist = GetAxis(Key.D, Key.A);
 
         float ws = GetAxis(Key.W, Key.S);
         bool shiftHeld = IsShiftHeld();
@@ -239,14 +239,14 @@ public class InputManager
             return;
 
         bool hasWs = Mathf.Abs(input.LeftArmElbow) > 0.001f;
-        bool hasWaist = Mathf.Abs(input.BodyWaist) > 0.001f;
-        bool hasArrows = Mathf.Abs(input.BodyForward) > 0.001f || Mathf.Abs(input.BodyStrafe) > 0.001f;
-        bool hasTurn = Mathf.Abs(input.BodyTurn) > 0.001f;
+        bool hasWaist = Mathf.Abs(input.TorsoWaist) > 0.001f;
+        bool hasArrows = Mathf.Abs(input.TorsoForward) > 0.001f || Mathf.Abs(input.TorsoStrafe) > 0.001f;
+        bool hasTurn = Mathf.Abs(input.TorsoTurn) > 0.001f;
 
         if (!hasWs && !hasWaist && !hasArrows && !hasTurn)
             return;
 
         _nextTitanInputLogTime = Time.unscaledTime + TitanInputLogIntervalSeconds;
-        InputDebug.Log($"Managers.Input arrows(fwd={input.BodyForward}, strafe={input.BodyStrafe}) turn={input.BodyTurn} waist(A/D)={input.BodyWaist} ws(W/S)={input.LeftArmElbow}");
+        InputDebug.Log($"Managers.Input arrows(fwd={input.TorsoForward}, strafe={input.TorsoStrafe}) turn={input.TorsoTurn} waist(A/D)={input.TorsoWaist} ws(W/S)={input.LeftArmElbow}");
     }
 }

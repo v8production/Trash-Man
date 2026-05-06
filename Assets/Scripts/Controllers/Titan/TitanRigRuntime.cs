@@ -17,7 +17,7 @@ public sealed class TitanRigRuntime : MonoBehaviour
     [SerializeField] private Transform rightFoot;
     [SerializeField] private Transform spine;
 
-    [Header("Body")]
+    [Header("Torso")]
     [SerializeField] private float waistYaw;
 
     [Header("Arm States")]
@@ -182,7 +182,7 @@ public sealed class TitanRigRuntime : MonoBehaviour
         rightLeg = state;
     }
 
-    public void ApplyBodyPose()
+    public void ApplyTorsoPose()
     {
         if (!EnsureReady())
         {
@@ -633,11 +633,11 @@ public sealed class TitanRigRuntime : MonoBehaviour
         float midY = Mathf.Lerp(minY, maxY, 0.50f);
         float lowY = Mathf.Lerp(minY, maxY, 0.30f);
 
-        // Shoulders: far left/right at upper body.
+        // Shoulders: far left/right at upper Torso.
         leftShoulder ??= PickExtremeX(space, candidates, upperY, true);
         rightShoulder ??= PickExtremeX(space, candidates, upperY, false);
 
-        // Hips: far left/right at lower body.
+        // Hips: far left/right at lower Torso.
         leftHip ??= PickExtremeX(space, candidates, lowY, true, below: true);
         rightHip ??= PickExtremeX(space, candidates, lowY, false, below: true);
 

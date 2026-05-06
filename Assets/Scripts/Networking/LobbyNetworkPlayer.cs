@@ -9,7 +9,7 @@ public class LobbyNetworkPlayer : NetworkBehaviour
 {
     private const string LobbyCameraPrefabName = "Lobby_Camera";
     private const string LobbyRangerPrefabName = "Ranger(TEMP)";
-    private const int FirstTitanRoleValue = (int)Define.TitanRole.Body;
+    private const int FirstTitanRoleValue = (int)Define.TitanRole.Torso;
     private const int LastTitanRoleValue = (int)Define.TitanRole.RightLeg;
 
     private readonly NetworkVariable<FixedString64Bytes> _discordUserId = new(default);
@@ -238,13 +238,13 @@ public class LobbyNetworkPlayer : NetworkBehaviour
     private void SubmitRoleInputServerRpc(TitanRoleInputPayload inputPayload)
     {
         TitanAggregatedInput snapshot = inputPayload.ToAggregatedInput();
-        bool hasInput = Mathf.Abs(snapshot.BodyWaist) > 0.001f
+        bool hasInput = Mathf.Abs(snapshot.TorsoWaist) > 0.001f
             || Mathf.Abs(snapshot.LeftArmElbow) > 0.001f
-            || Mathf.Abs(snapshot.BodyForward) > 0.001f
-            || Mathf.Abs(snapshot.BodyStrafe) > 0.001f
-            || Mathf.Abs(snapshot.BodyTurn) > 0.001f;
+            || Mathf.Abs(snapshot.TorsoForward) > 0.001f
+            || Mathf.Abs(snapshot.TorsoStrafe) > 0.001f
+            || Mathf.Abs(snapshot.TorsoTurn) > 0.001f;
         if (hasInput)
-            InputDebug.Log($"[ServerRpc] SubmitRoleInputServerRpc from client={OwnerClientId} waist={snapshot.BodyWaist} ws={snapshot.LeftArmElbow} fwd={snapshot.BodyForward} strafe={snapshot.BodyStrafe}");
+            InputDebug.Log($"[ServerRpc] SubmitRoleInputServerRpc from client={OwnerClientId} waist={snapshot.TorsoWaist} ws={snapshot.LeftArmElbow} fwd={snapshot.TorsoForward} strafe={snapshot.TorsoStrafe}");
         _roleInput.Value = inputPayload;
     }
 
@@ -262,7 +262,7 @@ public class LobbyNetworkPlayer : NetworkBehaviour
 
     public bool TryGetSelectedRole(out Define.TitanRole role)
     {
-        role = Define.TitanRole.Body;
+        role = Define.TitanRole.Torso;
         int mask = NormalizeTitanRoleMask(_selectedTitanRoleMask.Value);
         if (mask == 0)
             return false;
@@ -305,7 +305,7 @@ public class LobbyNetworkPlayer : NetworkBehaviour
 
     public bool TryGetActiveTitanRole(out Define.TitanRole role)
     {
-        role = Define.TitanRole.Body;
+        role = Define.TitanRole.Torso;
         int activeRoleValue = NormalizeTitanRoleValue(_activeTitanRole.Value);
         if (activeRoleValue == 0)
             return false;
@@ -335,7 +335,7 @@ public class LobbyNetworkPlayer : NetworkBehaviour
         if (Managers.Scene.CurrentScene == null || Managers.Scene.CurrentScene.SceneType != Define.Scene.Game)
             return;
 
-        TrySwitchActiveRoleFromDigit(1, Define.TitanRole.Body);
+        TrySwitchActiveRoleFromDigit(1, Define.TitanRole.Torso);
         TrySwitchActiveRoleFromDigit(2, Define.TitanRole.LeftArm);
         TrySwitchActiveRoleFromDigit(3, Define.TitanRole.RightArm);
         TrySwitchActiveRoleFromDigit(4, Define.TitanRole.LeftLeg);
@@ -841,7 +841,7 @@ public class LobbyNetworkPlayer : NetworkBehaviour
                 return (Define.TitanRole)roleValue;
         }
 
-        return Define.TitanRole.Body;
+        return Define.TitanRole.Torso;
     }
 
     private static bool IsValidTitanRoleValue(int roleValue)

@@ -399,7 +399,7 @@ public class LobbyScene : BaseScene
             return false;
 
         int currentMask = localPlayer.SelectedTitanRoleMaskValue;
-        int bit = 1 << (((int)selectedRole) - (int)Define.TitanRole.Body);
+        int bit = 1 << (((int)selectedRole) - (int)Define.TitanRole.Torso);
         int nextMask = currentMask ^ bit;
 
         localPlayer.ToggleTitanRoleSelection(selectedRole);
@@ -536,7 +536,7 @@ public class LobbyScene : BaseScene
             int roleMask = NormalizeRoleMask(entry.SelectedRoleMask);
             combinedRoleMask |= roleMask;
 
-            for (int roleValue = (int)Define.TitanRole.Body; roleValue <= (int)Define.TitanRole.RightLeg; roleValue++)
+            for (int roleValue = (int)Define.TitanRole.Torso; roleValue <= (int)Define.TitanRole.RightLeg; roleValue++)
             {
                 int bit = 1 << (roleValue - 1);
                 if ((roleMask & bit) == 0)
@@ -552,7 +552,7 @@ public class LobbyScene : BaseScene
             }
         }
 
-        for (int roleValue = (int)Define.TitanRole.Body; roleValue <= (int)Define.TitanRole.RightLeg; roleValue++)
+        for (int roleValue = (int)Define.TitanRole.Torso; roleValue <= (int)Define.TitanRole.RightLeg; roleValue++)
         {
             int bit = 1 << (roleValue - 1);
             if ((combinedRoleMask & bit) == 0)
@@ -572,7 +572,7 @@ public class LobbyScene : BaseScene
 
     private static int GetAllRoleMask()
     {
-        int count = ((int)Define.TitanRole.RightLeg - (int)Define.TitanRole.Body) + 1;
+        int count = ((int)Define.TitanRole.RightLeg - (int)Define.TitanRole.Torso) + 1;
         return (1 << count) - 1;
     }
 
@@ -580,7 +580,7 @@ public class LobbyScene : BaseScene
     {
         return role switch
         {
-            Define.TitanRole.Body => "Center",
+            Define.TitanRole.Torso => "Center",
             Define.TitanRole.LeftArm => "Left Arm",
             Define.TitanRole.RightArm => "Right Arm",
             Define.TitanRole.LeftLeg => "Left Leg",

@@ -159,14 +159,14 @@ public sealed class TitanRigManager
         runtime.SetLegState(left, state);
     }
 
-    public void ApplyBodyPose()
+    public void ApplyTorsoPose()
     {
         if (!EnsureBoundFromScene())
         {
             return;
         }
 
-        runtime.ApplyBodyPose();
+        runtime.ApplyTorsoPose();
     }
 
     public void ApplyArmPose(bool left)

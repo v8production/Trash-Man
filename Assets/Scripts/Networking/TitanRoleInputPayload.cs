@@ -12,10 +12,10 @@ public struct TitanRoleInputPayload : INetworkSerializable, IEquatable<TitanRole
     public bool RightMousePressedThisFrame;
     public bool RightMouseDetachBuffered;
 
-    public float BodyForward;
-    public float BodyStrafe;
-    public float BodyTurn;
-    public float BodyWaist;
+    public float TorsoForward;
+    public float TorsoStrafe;
+    public float TorsoTurn;
+    public float TorsoWaist;
 
     public float LeftArmElbow;
     public float RightArmElbow;
@@ -33,10 +33,10 @@ public struct TitanRoleInputPayload : INetworkSerializable, IEquatable<TitanRole
         RightMouseHeld = input.RightMouseHeld;
         RightMousePressedThisFrame = input.RightMousePressedThisFrame;
         RightMouseDetachBuffered = input.RightMouseDetachBuffered;
-        BodyForward = input.BodyForward;
-        BodyStrafe = input.BodyStrafe;
-        BodyTurn = input.BodyTurn;
-        BodyWaist = input.BodyWaist;
+        TorsoForward = input.TorsoForward;
+        TorsoStrafe = input.TorsoStrafe;
+        TorsoTurn = input.TorsoTurn;
+        TorsoWaist = input.TorsoWaist;
         LeftArmElbow = input.LeftArmElbow;
         RightArmElbow = input.RightArmElbow;
         LeftLegKnee = input.LeftLegKnee;
@@ -54,10 +54,10 @@ public struct TitanRoleInputPayload : INetworkSerializable, IEquatable<TitanRole
             RightMouseHeld = RightMouseHeld,
             RightMousePressedThisFrame = RightMousePressedThisFrame,
             RightMouseDetachBuffered = RightMouseDetachBuffered,
-            BodyForward = BodyForward,
-            BodyStrafe = BodyStrafe,
-            BodyTurn = BodyTurn,
-            BodyWaist = BodyWaist,
+            TorsoForward = TorsoForward,
+            TorsoStrafe = TorsoStrafe,
+            TorsoTurn = TorsoTurn,
+            TorsoWaist = TorsoWaist,
             LeftArmElbow = LeftArmElbow,
             RightArmElbow = RightArmElbow,
             LeftLegKnee = LeftLegKnee,
@@ -76,10 +76,10 @@ public struct TitanRoleInputPayload : INetworkSerializable, IEquatable<TitanRole
         serializer.SerializeValue(ref RightMouseHeld);
         serializer.SerializeValue(ref RightMousePressedThisFrame);
         serializer.SerializeValue(ref RightMouseDetachBuffered);
-        serializer.SerializeValue(ref BodyForward);
-        serializer.SerializeValue(ref BodyStrafe);
-        serializer.SerializeValue(ref BodyTurn);
-        serializer.SerializeValue(ref BodyWaist);
+        serializer.SerializeValue(ref TorsoForward);
+        serializer.SerializeValue(ref TorsoStrafe);
+        serializer.SerializeValue(ref TorsoTurn);
+        serializer.SerializeValue(ref TorsoWaist);
         serializer.SerializeValue(ref LeftArmElbow);
         serializer.SerializeValue(ref RightArmElbow);
         serializer.SerializeValue(ref LeftLegKnee);
@@ -97,10 +97,10 @@ public struct TitanRoleInputPayload : INetworkSerializable, IEquatable<TitanRole
             && RightMouseHeld == other.RightMouseHeld
             && RightMousePressedThisFrame == other.RightMousePressedThisFrame
             && RightMouseDetachBuffered == other.RightMouseDetachBuffered
-            && BodyForward.Equals(other.BodyForward)
-            && BodyStrafe.Equals(other.BodyStrafe)
-            && BodyTurn.Equals(other.BodyTurn)
-            && BodyWaist.Equals(other.BodyWaist)
+            && TorsoForward.Equals(other.TorsoForward)
+            && TorsoStrafe.Equals(other.TorsoStrafe)
+            && TorsoTurn.Equals(other.TorsoTurn)
+            && TorsoWaist.Equals(other.TorsoWaist)
             && LeftArmElbow.Equals(other.LeftArmElbow)
             && RightArmElbow.Equals(other.RightArmElbow)
             && LeftLegKnee.Equals(other.LeftLegKnee)
